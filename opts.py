@@ -11,7 +11,7 @@ from inspect import getmembers
 from itertools import count
 
 __all__ = ["Option", "BooleanOption", "IntOption", "FloatOption",
-           "DecimalOption", "MultipleOption", "Command", "Parser"]
+           "DecimalOption", "MultipleOptions", "Command", "Parser"]
 
 missing = object()
 _next_position_hint = count().next
