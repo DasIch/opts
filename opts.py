@@ -29,15 +29,15 @@ del Missing
 
 class cached_property(object):
     """
-    A cached property object caches the value returned by the `getter`.
+    A cached property object caches the value returned by the ``getter``.
 
     :param name:
         The name which should be used for the property, if you don't pass one
-        the name of the `getter` is used.
+        the name of the ``getter`` is used.
 
     :param doc:
         The docstring which should be used for the property, if no one is
-        passed the `getter`'s docstring is used.
+        passed the ``getter``'s docstring is used.
     """
     def __init__(self, getter, name=None, doc=None):
         self.getter = getter
@@ -62,8 +62,8 @@ class cached_property(object):
 def decode_arguments(arguments,
                      encoding=sys.stdin.encoding or sys.getdefaultencoding()):
     """
-    If any of the items in the given `arguments` list is a bytestring it will
-    be decoded using the given `encoding`.
+    If any of the items in the given ``arguments`` list is a byte string it
+    will be decoded using the given ``encoding``.
     """
     decoded = []
     for argument in arguments:
@@ -96,13 +96,13 @@ class Node(object):
 
 class Option(Node):
     """
-    Represents an string option.
+    Represents a string option.
 
     :param short:
-        A short variant of the option without the prefixed *-*.
+        A short variant of the option without the prefixed ``-``.
 
     :param long:
-        A long variant of the option without the prefixed *--*.
+        A long variant of the option without the prefixed ``--``.
 
     :param default:
         The default value for this option.
@@ -157,7 +157,7 @@ DecimalOption = type('DecimalOption', (Option, ),
 class MultipleOptions(Option):
     """
     Represents multiple values which are evaluated using the given
-    `sub_option`.
+    ``sub_option``.
 
     The values are seperated by commas, strings containing commas can be
     represented using single and double quotes.
@@ -246,7 +246,7 @@ class Command(Node):
 
     def evaluate(self, arguments=None):
         """
-        Evaluates the given list of arguments and returns a dictionary with
+        Evaluates the given list of ``arguments`` and returns a dictionary with
         the options and a list with remaining arguments.
         """
         if arguments is None:
@@ -312,9 +312,9 @@ class Command(Node):
                         self.description, self.callback)
 
 class Parser(Command):
-    def evaluate(self, arguments=sys.argv[1:]):
+    def evaluate(self, arguments=None):
         """
-        Evaluates the given list of arguments and returns a dictionary with
+        Evaluates the given list of ``arguments`` and returns a dictionary with
         the options and a list with the remaining arguments.
         """
-        return Command.evaluate(self, arguments)
+        return Command.evaluate(self, arguments or sys.argv[1:])
