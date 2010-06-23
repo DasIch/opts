@@ -1,0 +1,4 @@
+Opts
+====
+A simple python library for option parsing. This library is licensed under a
+three-clause BSD license, the full license can be found in the LICENSE file.
