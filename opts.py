@@ -142,17 +142,26 @@ class BooleanOption(Option):
     def evaluate(self):
         return not self.default
 
-#: Represents an integer option.
-IntOption = type('IntOption', (Option, ),
-                 dict(evaluate=lambda self, argument: int(argument)))
+class IntOption(Option):
+    """
+    Represents an integer option.
+    """
+    def evaluate(self, argument):
+        return int(argument)
 
-#: Represents a float option.
-FloatOption = type('FloatOption', (Option, ),
-                   dict(evaluate=lambda self, argument: float(argument)))
+class FloatOption(Option):
+    """
+    Represents a float option.
+    """
+    def evaluate(self, argument):
+        return float(argument)
 
-#: Represents a decimal option.
-DecimalOption = type('DecimalOption', (Option, ),
-                     dict(evaluate=lambda self, argument: Decimal(argument)))
+class DecimalOption(Option):
+    """
+    Represents a decimal option.
+    """
+    def evaluate(self, argument):
+        return Decimal(argument)
 
 class MultipleOptions(Option):
     """
