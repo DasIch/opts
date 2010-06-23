@@ -202,12 +202,6 @@ def get_option_attributes(obj):
 def get_command_attributes(obj):
     return getmembers(obj, lambda x: isinstance(x, Command))
 
-class CommandMeta(type):
-    def __call__(cls, *args, **kwargs):
-        cls.options = dict(get_option_attributes(cls))
-        cls.commands = dict(get_command_attributes(cls))
-        return type.__call__(cls, *args, **kwargs)
-
 class Command(Node):
     """
     Represents a command which unlike an option is not prefixed. A command can
@@ -220,15 +214,13 @@ class Command(Node):
         A function which get's called with the result of the evaluation instead
         of returning it.
     """
-    __metaclass__ = CommandMeta
-
     def __init__(self, options=None, commands=None, description=None,
                  callback=None):
         Node.__init__(self, description=description)
-        self.options = self.options.copy()
-        self.options.update(options or {})
-        self.commands = self.commands.copy()
-        self.commands.update(commands or {})
+        self.options = dict(get_option_attributes(self.__class__),
+                            **(options or {}))
+        self.commands = dict(get_command_attributes(self.__class__),
+                             **(commands or {}))
         self.callback = callback
 
     @cached_property
@@ -270,50 +262,40 @@ class Command(Node):
         argument_iter = enumerate(arguments)
         for i, argument in argument_iter:
             if argument.startswith(u'--'):
-                opts, args = self.evaluate_long_option(argument[2:],
-                                                       arguments[1 + i:])
-                options.update(opts)
-                for _ in xrange(len(args)):
-                    argument_iter.next()
+                options.update(self.evaluate_long_option(argument[2:],
+                                                         argument_iter))
             elif argument.startswith(u'-'):
-                opts, args = self.evaluate_short_options(list(argument[1:]),
-                                                         arguments[1 + i:])
-                options.update(opts)
-                for _ in xrange(len(args)):
-                    argument_iter.next()
+                options.update(self.evaluate_short_options(list(argument[1:]),
+                                                           argument_iter))
             else:
                 try:
                     command = self.commands[arguments[i]]
                 except KeyError:
-                    return options, arguments[1 + i:]
+                    return options, arguments[i:]
                 result = command.evaluate(arguments[1 + i:])
                 if self.callback is not None:
                     self.callback(*result)
                 return {arguments[i]: result}
+        return result
 
     def evaluate_short_options(self, shorts, arguments):
         result = {}
-        used_arguments = []
         for short in shorts:
             name, option = self.short_options[short]
             if option.requires_argument:
-                argument = arguments.pop(0)
-                used_arguments.append(argument)
-                result[name] = option.evaluate(argument)
+                result[name] = option.evaluate(arguments.next()[1])
             else:
                 result[name] = option.evaluate()
-        return result, used_arguments
+        return result
 
     def evaluate_long_option(self, long, arguments):
         name, option = self.long_options[long]
         used_arguments = []
         if option.requires_argument:
-            argument = arguments.pop(0)
-            used_arguments.append(argument)
-            value = option.evaluate(argument)
+            value = option.evaluate(arguments.next()[1])
         else:
             value = option.evaluate()
-        return {name: value}, arguments
+        return {name: value}
 
     def __repr__(self):
         return "{0}(options={1!r}, commands={2!r}, description={2!r}, callback={3!r})" \
