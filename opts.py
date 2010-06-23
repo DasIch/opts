@@ -156,13 +156,14 @@ DecimalOption = type('DecimalOption', (Option, ),
 
 class MultipleOptions(Option):
     """
-    Represents multiple values which are evaluated using the given `sub_option`.
+    Represents multiple values which are evaluated using the given
+    `sub_option`.
 
     The values are seperated by commas, strings containing commas can be
     represented using single and double quotes.
     """
-    def __init__(self, sub_option=Option, short=None, long=None, default=missing,
-                 description=None):
+    def __init__(self, sub_option=Option, short=None, long=None,
+                 default=missing, description=None):
         Option.__init__(self, short=short, long=long, default=default,
                         description=description)
         self.sub_option = sub_option()
