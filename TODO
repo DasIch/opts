@@ -1,0 +1,8 @@
+TODO
+====
+
+Currently this project is work in progress and there are several things I would
+like to implement but haven't until now. Those are:
+
+- Adding commands/options after instantiation of a command.
+- Add a -h, --help option to every command per default.
