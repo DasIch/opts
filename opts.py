@@ -145,6 +145,9 @@ class Option(Node):
         self.default = default
 
     def evaluate(self, argument=missing):
+        """
+        Evaluates the argument for this option.
+        """
         return argument
 
     def __repr__(self):
@@ -193,7 +196,11 @@ class MultipleOptions(Option):
     ``sub_option``.
 
     The values are seperated by commas, strings containing commas can be
-    represented using single and double quotes.
+    represented using single and double quotes::
+
+        "foo,bar,baz"   -> ["foo", "bar", "baz"]
+        "foo,'bar,bar'" -> ["foo", "bar,baz"]
+        'foo,"bar,baz"' -> ["foo", "bar,baz"]
     """
     def __init__(self, sub_option=Option, short=None, long=None,
                  default=missing, description=None):
