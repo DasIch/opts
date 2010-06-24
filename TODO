@@ -6,3 +6,5 @@ like to implement but haven't until now. Those are:
 
 - Adding commands/options after instantiation of a command.
 - Add a -h, --help option to every command per default.
+- Display a helpful message showing alternative options if the given one
+  doesn't exist.
