@@ -1,6 +1,8 @@
-Welcome to opts
-===============
-opts is a simple option parsing library.
+.. include:: ../README
+
+
+API Reference
+-------------
 
 .. module:: opts
 

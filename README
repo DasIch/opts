@@ -1,4 +1,14 @@
-Opts
-====
-A simple python library for option parsing. This library is licensed under a
-three-clause BSD license, the full license can be found in the LICENSE file.
+Welcome to opts
+===============
+opts is a simple python library which allows you to easiely parse command line
+arguments.
+
+Features
+--------
+
+- Supports so called commands e.g. ``hg clone``.
+
+- Supports abbreviations of commands and options e.g. ``hg cl`` instead of
+  ``hg clone`` or ``hg --he`` instead of ``hg --help``.
+
+- Declarative syntax for commands and parser.
