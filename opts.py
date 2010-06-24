@@ -221,7 +221,8 @@ class Command(Node):
                             **(options or {}))
         self.commands = dict(get_command_attributes(self.__class__),
                              **(commands or {}))
-        self.callback = callback
+        if self.callback is None or not hasattr(self, "callback"):
+            self.callback = callback
 
     @cached_property
     def short_options(self):
