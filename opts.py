@@ -140,6 +140,10 @@ class Option(Node):
     #: Set to ``True`` if this option requires an argument for evaluation.
     requires_argument = True
 
+    #: Set this to ``True`` if the option allows an argument but does not
+    #: require it.
+    allows_optional_argument = False
+
     def __init__(self, short=None, long=None, default=missing,
                  description=None):
         Node.__init__(self, description=description)
@@ -341,6 +345,13 @@ class Command(Node):
             name, option = self.short_options[short]
             if option.requires_argument:
                 result[name] = option.evaluate(arguments.next()[1])
+            elif option.allows_optional_argument:
+                try:
+                    argument = arguments.next()[1]
+                except StopIteration:
+                    result[name] = option.evaluate()
+                else:
+                    result[name] = option.evaluate(argument)
             else:
                 result[name] = option.evaluate()
         return result
@@ -350,6 +361,13 @@ class Command(Node):
         used_arguments = []
         if option.requires_argument:
             value = option.evaluate(arguments.next()[1])
+        elif option.allows_optional_argument:
+            try:
+                argument = arguments.next()[1]
+            except StopIteration:
+                value = option.evaluate()
+            else:
+                value = option.evaluate(argument)
         else:
             value = option.evaluate()
         return {name: value}
