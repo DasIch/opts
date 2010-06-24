@@ -221,7 +221,7 @@ class Command(Node):
                             **(options or {}))
         self.commands = dict(get_command_attributes(self.__class__),
                              **(commands or {}))
-        if self.callback is None or not hasattr(self, "callback"):
+        if callback is None or not hasattr(self, "callback"):
             self.callback = callback
 
     @cached_property
