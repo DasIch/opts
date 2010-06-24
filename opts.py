@@ -8,7 +8,7 @@
 import sys
 from decimal import Decimal
 from inspect import getmembers
-from itertools import count
+from itertools import count, izip_longest
 
 __all__ = ["Option", "BooleanOption", "IntOption", "FloatOption",
            "DecimalOption", "MultipleOptions", "Command", "Parser"]
@@ -71,6 +71,30 @@ def decode_arguments(arguments,
             argument = argument.decode(encoding)
         decoded.append(argument)
     return decoded
+
+def abbreviations(strings):
+    """
+    Returns a dictionary with abbreviations of the given `strings` as keys for
+    those.
+    """
+    def shorter(s):
+        for i in xrange(1, len(s)):
+            yield s, s[:-i]
+
+    strings = list(strings)
+    string_to_abbs = dict((s, []) for s in strings)
+    for abbs in izip_longest(*map(shorter, strings)):
+        abbs = dict(a or (strings[i], None) for i, a in enumerate(abbs))
+        values = abbs.values()
+        for key, value in abbs.iteritems():
+            if value is not None and values.count(value) == 1:
+                string_to_abbs[key].append(value)
+
+    result = {}
+    for string, abbs in string_to_abbs.iteritems():
+        for abb in abbs:
+            result[abb] = string
+    return result
 
 class Node(object):
     """
@@ -214,8 +238,16 @@ class Command(Node):
         A function which get's called with the result of the evaluation instead
         of returning it.
     """
+    #: If ``True`` allows commands to be abbreviated e.g. you can pass ``he``
+    #: instead of ``help`` as long as there is no conflict with other commands.
+    allow_abbreviated_commands = True
+
+    #: The same as :attr:`allow_abbreviated_commands` for long options.
+    allow_abbreviated_options = True
+
     def __init__(self, options=None, commands=None, description=None,
-                 callback=None):
+                 callback=None, allow_abbreviated_commands=True,
+                 allow_abbreviated_options=True):
         Node.__init__(self, description=description)
         self.options = dict(get_option_attributes(self.__class__),
                             **(options or {}))
@@ -223,6 +255,16 @@ class Command(Node):
                              **(commands or {}))
         if callback is None or not hasattr(self, "callback"):
             self.callback = callback
+        if allow_abbreviated_commands != self.allow_abbreviated_commands:
+            self.allow_abbreviated_commands = allow_abbreviated_commands
+        if allow_abbreviated_options != self.allow_abbreviated_options:
+            self.allow_abbreviated_options = allow_abbreviated_options
+
+        if self.allow_abbreviated_commands:
+            commands = self.commands.copy()
+            for key, value in abbreviations(self.commands).iteritems():
+                commands[key] = self.commands[value]
+            self.commands = commands
 
     @cached_property
     def short_options(self):
@@ -241,9 +283,13 @@ class Command(Node):
         A dictionary mapping the long variants of the options to a tuple of
         the name of the option and the option itself.
         """
-        result = {}
+        long_options = {}
         for name, option in self.options.iteritems():
-            result[option.long] = (name, option)
+            long_options[option.long] = (name, option)
+
+        result = long_options.copy()
+        for abbr, long_option in abbreviations(long_options).iteritems():
+            result[abbr] = long_options[long_option]
         return result
 
     def evaluate(self, arguments=None):
