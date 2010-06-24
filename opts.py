@@ -4,6 +4,9 @@
     ~~~~
 
     A simple option parser.
+
+    :copyright: 2010 by Daniel Neuhäuser
+    :license: BSD, see LICENSE for details.
 """
 import sys
 from decimal import Decimal
