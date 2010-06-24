@@ -271,9 +271,9 @@ class Command(Node):
             self.allow_abbreviated_options = allow_abbreviated_options
 
         if self.allow_abbreviated_commands:
-            commands = self.commands.copy()
+            commands = dict((k, (k, v)) for k, v in self.commands.iteritems())
             for key, value in abbreviations(self.commands).iteritems():
-                commands[key] = self.commands[value]
+                commands[key] = (value, self.commands[value])
             self.commands = commands
 
     @cached_property
@@ -326,13 +326,13 @@ class Command(Node):
                                                            argument_iter))
             else:
                 try:
-                    command = self.commands[arguments[i]]
+                    name, command = self.commands[arguments[i]]
                 except KeyError:
                     return options, arguments[i:]
                 result = command.evaluate(arguments[1 + i:])
                 if self.callback is not None:
                     self.callback(*result)
-                return {arguments[i]: result}
+                return {name: result}
         return result
 
     def evaluate_short_options(self, shorts, arguments):
