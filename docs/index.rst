@@ -29,3 +29,8 @@ API Reference
 
 .. autoclass:: Parser
    :members:
+
+License Text
+------------
+
+.. include:: ../LICENSE
