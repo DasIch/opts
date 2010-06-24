@@ -16,9 +16,10 @@ from opts import *
 class TestCommand(unittest.TestCase):
     def test_remaining_arguments(self):
         c = Command(options={'a': Option('a')})
-        self.assertEqual(c.evaluate([u'foo']), ({}, [u'foo']))
-        self.assertEqual(c.evaluate([u'-a', u'foo']), ({'a': u'foo'}, []))
-        self.assertEqual(c.evaluate([u'-a', u'foo', u'bar']),
+        cp = [u'script_name']
+        self.assertEqual(c.evaluate(cp, [u'foo']), ({}, [u'foo']))
+        self.assertEqual(c.evaluate(cp, [u'-a', u'foo']), ({'a': u'foo'}, []))
+        self.assertEqual(c.evaluate(cp, [u'-a', u'foo', u'bar']),
                          ({'a': u'foo'}, [u'bar']))
 
     def test_options(self):
@@ -29,14 +30,15 @@ class TestCommand(unittest.TestCase):
         b = Command(options={
             'spam': Option('a', 'asomething'),
             'eggs': Option('b', 'bsomething')})
+        cp = [u'script_name']
         for c in [a, b]:
-            self.assertEqual(c.evaluate([u'-a', u'foo']),
+            self.assertEqual(c.evaluate(cp, [u'-a', u'foo']),
                              ({u'spam': u'foo'}, []))
-            self.assertEqual(c.evaluate([u'--asomething', u'foo']),
+            self.assertEqual(c.evaluate(cp, [u'--asomething', u'foo']),
                              ({u'spam': u'foo'}, []))
-            self.assertEqual(c.evaluate([u'-b', u'foo']),
+            self.assertEqual(c.evaluate(cp, [u'-b', u'foo']),
                              ({u'eggs': u'foo'}, []))
-            self.assertEqual(c.evaluate([u'--bsomething', u'foo']),
+            self.assertEqual(c.evaluate(cp, [u'--bsomething', u'foo']),
                              ({u'eggs': u'foo'}, []))
 
     def test_commands(self):
@@ -47,9 +49,10 @@ class TestCommand(unittest.TestCase):
         b = Command(commands={
             'spam': Command(),
             'eggs': Command()})
+        cp = [u'script_name']
         for c in [a, b]:
-            self.assertEqual(c.evaluate([u'spam']), {u'spam': ({}, [])})
-            self.assertEqual(c.evaluate([u'eggs']), {u'eggs': ({}, [])})
+            self.assertEqual(c.evaluate(cp, [u'spam']), {u'spam': ({}, [])})
+            self.assertEqual(c.evaluate(cp, [u'eggs']), {u'eggs': ({}, [])})
 
     def test_abbreviations(self):
         c = Command(
@@ -60,18 +63,19 @@ class TestCommand(unittest.TestCase):
                 'stack': Command(),
                 'stash': Command()})
 
+        cp = [u'script_name']
         for s in [u's', u'st', u'sta']:
             result = ({}, [s])
-            self.assertEqual(c.evaluate([s]), result)
-            self.assertEqual(c.evaluate([s]), result)
-            self.assertEqual(c.evaluate([s]), result)
+            self.assertEqual(c.evaluate(cp, [s]), result)
+            self.assertEqual(c.evaluate(cp, [s]), result)
+            self.assertEqual(c.evaluate(cp, [s]), result)
 
-        self.assertEqual(c.evaluate([u'stac']), {u'stack': ({}, [])})
-        self.assertEqual(c.evaluate([u'stas']), {u'stash': ({}, [])})
+        self.assertEqual(c.evaluate(cp, [u'stac']), {u'stack': ({}, [])})
+        self.assertEqual(c.evaluate(cp, [u'stas']), {u'stash': ({}, [])})
 
-        self.assertEqual(c.evaluate([u'--stac', u'foo']),
+        self.assertEqual(c.evaluate(cp, [u'--stac', u'foo']),
                          ({u'stack': u'foo'}, []))
-        self.assertEqual(c.evaluate([u'--stas', u'foo']),
+        self.assertEqual(c.evaluate(cp, [u'--stas', u'foo']),
                          ({u'stash': u'foo'}, []))
 
 class TestParser(unittest.TestCase):

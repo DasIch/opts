@@ -9,9 +9,11 @@
     :license: BSD, see LICENSE for details.
 """
 import sys
+import codecs
 from decimal import Decimal
 from inspect import getmembers
 from itertools import count, izip_longest
+from operator import itemgetter, attrgetter
 
 __all__ = ["Option", "BooleanOption", "IntOption", "FloatOption",
            "DecimalOption", "MultipleOptions", "Command", "Parser"]
@@ -110,7 +112,7 @@ class Node(object):
         self.description = description
         self._position_hint = _next_position_hint()
 
-    def evaluate(self, argument):
+    def evaluate(self, callpath, argument):
         """
         Evaluates the given argument
         """
@@ -151,7 +153,7 @@ class Option(Node):
         self.long = unicode(long)
         self.default = default
 
-    def evaluate(self, argument=missing):
+    def evaluate(self, callpath, argument=missing):
         """
         Evaluates the argument for this option.
         """
@@ -173,28 +175,28 @@ class BooleanOption(Option):
         Option.__init__(self, short=short, long=long, default=default,
                         description=description)
 
-    def evaluate(self):
+    def evaluate(self, callpath):
         return not self.default
 
 class IntOption(Option):
     """
     Represents an integer option.
     """
-    def evaluate(self, argument):
+    def evaluate(self, callpath, argument):
         return int(argument)
 
 class FloatOption(Option):
     """
     Represents a float option.
     """
-    def evaluate(self, argument):
+    def evaluate(self, callpath, argument):
         return float(argument)
 
 class DecimalOption(Option):
     """
     Represents a decimal option.
     """
-    def evaluate(self, argument):
+    def evaluate(self, callpath, argument):
         return Decimal(argument)
 
 class MultipleOptions(Option):
@@ -215,23 +217,23 @@ class MultipleOptions(Option):
                         description=description)
         self.sub_option = sub_option()
 
-    def evaluate(self, argument):
+    def evaluate(self, callpath, argument):
         result = []
         buffer = []
         open_quote = False
         for char in argument:
             if char in [u"'", u'"']:
                 if open_quote:
-                    result.append(u''.join(buffer))
+                    result.append(u"".join(buffer))
                     buffer = []
                 open_quote = not open_quote
-            elif char == u',' and not open_quote:
-                result.append(u''.join(buffer))
+            elif char == u"," and not open_quote:
+                result.append(u"".join(buffer))
                 buffer = []
             else:
                 buffer.append(char)
         if buffer:
-            result.append(u''.join(buffer))
+            result.append(u"".join(buffer))
         return map(self.sub_option.evaluate, result)
 
 def get_option_attributes(obj):
@@ -306,15 +308,11 @@ class Command(Node):
             result[abbr] = long_options[long_option]
         return result
 
-    def evaluate(self, arguments=None):
+    def evaluate(self, callpath, arguments):
         """
         Evaluates the given list of ``arguments`` and returns a dictionary with
         the options and a list with remaining arguments.
         """
-        if arguments is None:
-            arguments = []
-        else:
-            arguments = decode_arguments(arguments)
         options = {}
         for name, option in self.options.iteritems():
             if option.default is not missing:
@@ -322,54 +320,61 @@ class Command(Node):
         result = options, []
         argument_iter = enumerate(arguments)
         for i, argument in argument_iter:
-            if argument.startswith(u'--'):
-                options.update(self.evaluate_long_option(argument[2:],
+            if argument.startswith(u"--"):
+                callpath.append((argument, None))
+                options.update(self.evaluate_long_option(callpath,
+                                                         argument[2:],
                                                          argument_iter))
-            elif argument.startswith(u'-'):
-                options.update(self.evaluate_short_options(list(argument[1:]),
+            elif argument.startswith(u"-"):
+                callpath.append((argument, None))
+                options.update(self.evaluate_short_options(callpath,
+                                                           list(argument[1:]),
                                                            argument_iter))
             else:
                 try:
                     name, command = self.commands[arguments[i]]
                 except KeyError:
                     return options, arguments[i:]
-                result = command.evaluate(arguments[1 + i:])
+                callpath.append(arguments[i])
+                result = command.evaluate(callpath, arguments[1 + i:])
                 if self.callback is not None:
                     self.callback(*result)
                 return {name: result}
         return result
 
-    def evaluate_short_options(self, shorts, arguments):
+    def evaluate_short_options(self, callpath, shorts, arguments):
         result = {}
         for short in shorts:
             name, option = self.short_options[short]
+            callpath[-1] = (callpath[-1][0], option)
             if option.requires_argument:
-                result[name] = option.evaluate(arguments.next()[1])
+                result[name] = option.evaluate(callpath, arguments.next()[1])
             elif option.allows_optional_argument:
                 try:
                     argument = arguments.next()[1]
                 except StopIteration:
-                    result[name] = option.evaluate()
+                    result[name] = option.evaluate(callpath)
                 else:
-                    result[name] = option.evaluate(argument)
+                    result[name] = option.evaluate(callpath, argument)
             else:
-                result[name] = option.evaluate()
+                result[name] = option.evaluate(callpath)
         return result
 
-    def evaluate_long_option(self, long, arguments):
+    def evaluate_long_option(self, callpath, long, arguments):
         name, option = self.long_options[long]
+        callpath[-1] = (callpath[-1][0], option)
         used_arguments = []
         if option.requires_argument:
-            value = option.evaluate(arguments.next()[1])
+            value = option.evaluate(callpath, arguments.next()[1])
         elif option.allows_optional_argument:
             try:
                 argument = arguments.next()[1]
             except StopIteration:
-                value = option.evaluate()
+                value = option.evaluate(callpath)
             else:
-                value = option.evaluate(argument)
+                value = option.evaluate(callpath, argument)
         else:
-            value = option.evaluate()
+            value = option.evaluate(callpath)
         return {name: value}
 
     def __repr__(self):
@@ -378,9 +383,46 @@ class Command(Node):
                         self.description, self.callback)
 
 class Parser(Command):
+    def __init__(self, script_name=sys.argv[0], description=None,
+                 out_file=sys.stdout, takes_arguments=True):
+        Command.__init__(self, description=None)
+        self.script_name = script_name
+        self.out_file = out_file
+        self.takes_arguments = takes_arguments
+
+    @property
+    def out_file(self):
+        """
+        A file-like object to which any output is being written.
+        """
+        return self._out_file
+
+    @out_file.setter
+    def out_file(self, fobj):
+        if isinstance(fobj, codecs.StreamReaderWriter):
+            self._out_file = fobj
+        encoding = getattr(fobj, "encoding", None)
+        if encoding is None:
+            encoding = "ascii"
+            errors = "replace"
+        else:
+            errors = "strict"
+        codec_info = codecs.lookup(fobj.encoding)
+        self._out_file = codecs.StreamReaderWriter(fobj,
+                                                   codec_info.streamreader,
+                                                   codec_info.streamwriter,
+                                                   errors)
+
     def evaluate(self, arguments=None):
         """
         Evaluates the given list of ``arguments`` and returns a dictionary with
         the options and a list with the remaining arguments.
         """
-        return Command.evaluate(self, arguments or sys.argv[1:])
+        arguments = decode_arguments(arguments or sys.argv[1:])
+        return Command.evaluate(self, [(self.script_name, self)],
+                                arguments or sys.argv[1:])
+
+    def __repr__(self):
+        return "{0}(script_name={1!r}, description={2!r})" \
+                .format(self.__class__.__name__, self.script_name,
+                        self.description)
