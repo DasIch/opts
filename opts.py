@@ -429,7 +429,7 @@ class Command(Node):
                 result = command.evaluate(callpath, arguments[1 + i:])
                 if self.callback is not None:
                     self.callback(*result)
-                return {name: result}
+                return {name: result}, []
         return result
 
     def evaluate_short_options(self, callpath, shorts, arguments):
