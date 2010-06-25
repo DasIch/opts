@@ -14,3 +14,10 @@ Features
 - Shows possible alternatives if you pass a command or an option does not exist
 
 - Declarative syntax for commands and parser.
+
+Links
+-----
+
+- http://github.com/DasIch/opts
+- http://packages.python.org/opts
+- http://pypi.python.org/pypi/opts/0.1
