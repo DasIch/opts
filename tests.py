@@ -51,8 +51,8 @@ class TestCommand(unittest.TestCase):
             'eggs': Command()})
         cp = [u'script_name']
         for c in [a, b]:
-            self.assertEqual(c.evaluate(cp, [u'spam']), {u'spam': ({}, [])})
-            self.assertEqual(c.evaluate(cp, [u'eggs']), {u'eggs': ({}, [])})
+            self.assertEqual(c.evaluate(cp, [u'spam']), ({u'spam': ({}, [])}, []))
+            self.assertEqual(c.evaluate(cp, [u'eggs']), ({u'eggs': ({}, [])}, []))
 
     def test_abbreviations(self):
         c = Command(
@@ -70,8 +70,8 @@ class TestCommand(unittest.TestCase):
             self.assertEqual(c.evaluate(cp, [s]), result)
             self.assertEqual(c.evaluate(cp, [s]), result)
 
-        self.assertEqual(c.evaluate(cp, [u'stac']), {u'stack': ({}, [])})
-        self.assertEqual(c.evaluate(cp, [u'stas']), {u'stash': ({}, [])})
+        self.assertEqual(c.evaluate(cp, [u'stac']), ({u'stack': ({}, [])}, []))
+        self.assertEqual(c.evaluate(cp, [u'stas']), ({u'stash': ({}, [])}, []))
 
         self.assertEqual(c.evaluate(cp, [u'--stac', u'foo']),
                          ({u'stack': u'foo'}, []))

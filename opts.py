@@ -312,12 +312,17 @@ class Command(Node):
     #: The same as :attr:`allow_abbreviated_commands` for long options.
     allow_abbreviated_options = True
 
+    #: If the command does not require any arguments additional to the options
+    #: and commands, set this to ``False``.
+    takes_arguments = True
+
     use_auto_help = True
 
     def __init__(self, options=None, commands=None, short_description=None,
                  long_description=None, callback=None,
-                 allow_abbreviated_commands=True,
-                 allow_abbreviated_options=True):
+                 allow_abbreviated_commands=None,
+                 allow_abbreviated_options=None,
+                 takes_arguments=None):
         Node.__init__(self, short_description=short_description,
                       long_description=long_description)
         self.options = dict(get_option_attributes(self.__class__),
@@ -328,10 +333,12 @@ class Command(Node):
             self.commands.setdefault(u"help", HelpCommand())
         if callback is None or not hasattr(self, "callback"):
             self.callback = callback
-        if allow_abbreviated_commands != self.allow_abbreviated_commands:
+        if allow_abbreviated_commands is not None:
             self.allow_abbreviated_commands = allow_abbreviated_commands
-        if allow_abbreviated_options != self.allow_abbreviated_options:
+        if allow_abbreviated_options is not None:
             self.allow_abbreviated_options = allow_abbreviated_options
+        if takes_arguments is not None:
+            self.takes_arguments = takes_arguments
 
     @cached_property
     def short_options(self):
@@ -489,8 +496,8 @@ class HelpCommand(Command):
                  short_description=u"Shows this message.",
                  long_description=u"Displays every command and option.",
                  callback=None,
-                 allow_abbreviated_commands=True,
-                 allow_abbreviated_options=True):
+                 allow_abbreviated_commands=None,
+                 allow_abbreviated_options=None):
         Command.__init__(self, options=options, commands=commands,
                          short_description=short_description,
                          long_description=long_description, callback=callback,
@@ -557,9 +564,10 @@ class HelpCommand(Command):
 
 class Parser(Command):
     def __init__(self, options=None, commands=None, script_name=sys.argv[0],
-                 description=None, out_file=sys.stdout):
+                 description=None, out_file=sys.stdout, takes_arguments=None):
         Command.__init__(self, options=options, commands=commands,
-                         long_description=description)
+                         long_description=description,
+                         takes_arguments=takes_arguments)
         self.script_name = script_name
         self.out_file = out_file
 
