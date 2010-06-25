@@ -13,7 +13,7 @@ import codecs
 from decimal import Decimal
 from inspect import getmembers
 from itertools import count, izip_longest
-from operator import itemgetter, attrgetter
+from operator import attrgetter, itemgetter
 
 __all__ = ["Option", "BooleanOption", "IntOption", "FloatOption",
            "DecimalOption", "MultipleOptions", "Command", "Parser"]
@@ -77,15 +77,15 @@ def decode_arguments(arguments,
         decoded.append(argument)
     return decoded
 
+def shorter(string):
+    for i in xrange(1, len(string)):
+        yield string, string[:-1]
+
 def abbreviations(strings):
     """
     Returns a dictionary with abbreviations of the given `strings` as keys for
     those.
     """
-    def shorter(s):
-        for i in xrange(1, len(s)):
-            yield s, s[:-i]
-
     strings = list(strings)
     string_to_abbs = dict((s, []) for s in strings)
     for abbs in izip_longest(*map(shorter, strings)):
@@ -101,27 +101,66 @@ def abbreviations(strings):
             result[abb] = string
     return result
 
+def matches(beginning, strings):
+    """
+    Returns every string from the given `strings` starting with the given
+    `beginning`.
+    """
+    for string in strings:
+        if string.startswith(beginning):
+            yield string
+
+def get_usage(command, callpath):
+    result = [u"usage: {0}".format(u" ".join(map(itemgetter(0), callpath)))]
+    if command.options:
+        result.append(u"[options]")
+    if len(command.commands) > 1 or \
+            command.commands and u"help" not in command.commands:
+        result.append(u"[commands]")
+    return u" ".join(result)
+
 class Node(object):
     """
     Represents an argument passed to your script.
 
-    :param description:
-        The description of this argument.
+    :param short_description:
+        A short description no longer than one line.
+
+    :param long_description:
+        A longer detailed description.
     """
-    def __init__(self, description=None):
-        self.description = description
+    def __init__(self, short_description=None, long_description=None):
+        self.short_description = short_description
+        self.long_description = long_description
         self._position_hint = _next_position_hint()
+
+    @property
+    def short_description(self):
+        return self._short_description or u"No short description."
+
+    @short_description.setter
+    def short_description(self, short_description):
+        self._short_description = short_description
+
+    @property
+    def long_description(self):
+        return self._long_description or u"No long description."
+
+    @long_description.setter
+    def long_description(self, long_description):
+        self._long_description = long_description
 
     def evaluate(self, callpath, argument):
         """
         Evaluates the given argument
         """
-        raise NotImplementedError(
-                "{0}.evaluate(argument)".format(self.__class__.__name__))
+        raise NotImplementedError("{0}.evaluate(callpath, argument)" \
+                .format(self.__class__.__name__))
 
     def __repr__(self):
-        return "{0}(description={1!r})".format(self.__class__.__name__,
-                                               self.description)
+        return "{0}(short_description={1!r}, long_description={2!r})" \
+                .format(self.__class__.__name__, self.short_description,
+                        self.long_description)
 
 class Option(Node):
     """
@@ -136,8 +175,12 @@ class Option(Node):
     :param default:
         The default value for this option.
 
-    :param description:
-        A description of the option.
+    :param short_description:
+        A short one-line description which can be displayed along with
+        several other short descriptions by the help command.
+
+    :param long_description:
+        A long detailed description.
     """
     #: Set to ``True`` if this option requires an argument for evaluation.
     requires_argument = True
@@ -147,8 +190,9 @@ class Option(Node):
     allows_optional_argument = False
 
     def __init__(self, short=None, long=None, default=missing,
-                 description=None):
-        Node.__init__(self, description=description)
+                 short_description=None, long_description=None):
+        Node.__init__(self, short_description=short_description,
+                      long_description=long_description)
         self.short = unicode(short)
         self.long = unicode(long)
         self.default = default
@@ -160,9 +204,13 @@ class Option(Node):
         return argument
 
     def __repr__(self):
-        return "{0}(short={1!r}, long={2!r}, default={3!r}, description={4!r})" \
-                .format(self.__class__.__name__, self.short, self.long,
-                        self.default, self.description)
+        return ("{0}(short={1!r}, long={2!r}, default={3!r}, "
+                "short_description={4!r}, "
+                "long_description={5!r})").format(self.__class__.__name__,
+                                                  self.short, self.long,
+                                                  self.default,
+                                                  self.short_description,
+                                                  self.long_description)
 
 class BooleanOption(Option):
     """
@@ -171,9 +219,11 @@ class BooleanOption(Option):
     """
     requires_argument = False
 
-    def __init__(self, short=None, long=None, default=False, description=None):
+    def __init__(self, short=None, long=None, default=False,
+                 short_description=None, long_description=None):
         Option.__init__(self, short=short, long=long, default=default,
-                        description=description)
+                        short_description=short_description,
+                        long_description=long_description)
 
     def evaluate(self, callpath):
         return not self.default
@@ -261,26 +311,26 @@ class Command(Node):
     #: The same as :attr:`allow_abbreviated_commands` for long options.
     allow_abbreviated_options = True
 
-    def __init__(self, options=None, commands=None, description=None,
-                 callback=None, allow_abbreviated_commands=True,
+    use_auto_help = True
+
+    def __init__(self, options=None, commands=None, short_description=None,
+                 long_description=None, callback=None,
+                 allow_abbreviated_commands=True,
                  allow_abbreviated_options=True):
-        Node.__init__(self, description=description)
+        Node.__init__(self, short_description=short_description,
+                      long_description=long_description)
         self.options = dict(get_option_attributes(self.__class__),
                             **(options or {}))
         self.commands = dict(get_command_attributes(self.__class__),
                              **(commands or {}))
+        if self.use_auto_help:
+            self.commands.setdefault(u"help", HelpCommand())
         if callback is None or not hasattr(self, "callback"):
             self.callback = callback
         if allow_abbreviated_commands != self.allow_abbreviated_commands:
             self.allow_abbreviated_commands = allow_abbreviated_commands
         if allow_abbreviated_options != self.allow_abbreviated_options:
             self.allow_abbreviated_options = allow_abbreviated_options
-
-        if self.allow_abbreviated_commands:
-            commands = dict((k, (k, v)) for k, v in self.commands.iteritems())
-            for key, value in abbreviations(self.commands).iteritems():
-                commands[key] = (value, self.commands[value])
-            self.commands = commands
 
     @cached_property
     def short_options(self):
@@ -303,10 +353,44 @@ class Command(Node):
         for name, option in self.options.iteritems():
             long_options[option.long] = (name, option)
 
+        if not self.allow_abbreviated_options:
+            return long_options
         result = long_options.copy()
         for abbr, long_option in abbreviations(long_options).iteritems():
             result[abbr] = long_options[long_option]
         return result
+
+    @cached_property
+    def all_commands(self):
+        commands = dict((k, (k, v)) for k, v in self.commands.iteritems())
+        if not self.allow_abbreviated_commands:
+            return commands.copy()
+        for abbr, command in abbreviations(commands).iteritems():
+            commands[abbr] = commands[command]
+        return commands
+
+    def print_missing_node(self, node, callpath):
+        write = lambda x: callpath[0][1].out_file.write(x + u"\n")
+        write(get_usage(callpath[-1][1], callpath))
+        write(u"")
+        if node.startswith(u"-"):
+            type = u"option"
+            possible_items = [option.long for option in self.options.values()]
+        else:
+            type = u"command"
+            possible_items = self.commands.keys()
+        for shorter_version in shorter(node):
+            items = list(matches(shorter_version, possible_items))
+            if items:
+                break
+        if not items:
+            write(u"The given {0} \"{1}\" does not exist.".format(type, node))
+            return
+        write(u"The given {0} \"{1}\" does not exist, did you mean?" \
+                .format(type, node))
+        for item in items:
+            write(u" - {0}".format(item))
+        write(u"")
 
     def evaluate(self, callpath, arguments):
         """
@@ -332,10 +416,13 @@ class Command(Node):
                                                            argument_iter))
             else:
                 try:
-                    name, command = self.commands[arguments[i]]
+                    name, command = self.all_commands[arguments[i]]
                 except KeyError:
+                    if not self.takes_arguments:
+                        self.print_missing_node(arguments[i], callpath)
+                        return
                     return options, arguments[i:]
-                callpath.append(arguments[i])
+                callpath.append((arguments[i], command))
                 result = command.evaluate(callpath, arguments[1 + i:])
                 if self.callback is not None:
                     self.callback(*result)
@@ -345,7 +432,11 @@ class Command(Node):
     def evaluate_short_options(self, callpath, shorts, arguments):
         result = {}
         for short in shorts:
-            name, option = self.short_options[short]
+            try:
+                name, option = self.short_options[short]
+            except KeyError:
+                self.print_missing_node(u"-" + short, callpath)
+                return
             callpath[-1] = (callpath[-1][0], option)
             if option.requires_argument:
                 result[name] = option.evaluate(callpath, arguments.next()[1])
@@ -361,7 +452,11 @@ class Command(Node):
         return result
 
     def evaluate_long_option(self, callpath, long, arguments):
-        name, option = self.long_options[long]
+        try:
+            name, option = self.long_options[long]
+        except KeyError:
+            self.print_missing_node(callpath[-1][0], callpath)
+            return
         callpath[-1] = (callpath[-1][0], option)
         used_arguments = []
         if option.requires_argument:
@@ -378,17 +473,91 @@ class Command(Node):
         return {name: value}
 
     def __repr__(self):
-        return "{0}(options={1!r}, commands={2!r}, description={2!r}, callback={3!r})" \
-                .format(self.__class__.__name__, self.options, self.commands,
-                        self.description, self.callback)
+        return ("{0}(options={1!r}, commands={2!r}, short_description={2!r}, "
+                "long_description={3!r}, callback={4!r})"). \
+                        format(self.__class__.__name__, self.options,
+                               self.commands, self.short_description,
+                               self.long_description, self.callback)
+
+class HelpCommand(Command):
+    use_auto_help = False
+
+    def __init__(self, options=None, commands=None,
+                 short_description=u"Shows this message.",
+                 long_description=u"Displays every command and option.",
+                 callback=None,
+                 allow_abbreviated_commands=True,
+                 allow_abbreviated_options=True):
+        Command.__init__(self, options=options, commands=commands,
+                         short_description=short_description,
+                         long_description=long_description, callback=callback,
+                         allow_abbreviated_commands=allow_abbreviated_commands,
+                         allow_abbreviated_options=allow_abbreviated_options)
+
+    def evaluate(self, callpath, arguments):
+        command = callpath[-2][1]
+        try:
+            argument = arguments[0]
+        except IndexError:
+            argument, node = callpath[-2]
+            callpath = callpath[:-1]
+        else:
+            if argument.startswith(u'--'):
+                try:
+                    node = command.long_options[argument[2:]][1]
+                except KeyError:
+                    self.print_missing_node(argument, callpath)
+                    return
+                else:
+                    argument = argument[2:]
+            if argument.startswith(u'-'):
+                try:
+                    node = command.short_options[argument[1:]][1]
+                except KeyError:
+                    self.print_missing_node(argument, callpath)
+                    return
+                else:
+                    argument = argument[1:]
+            else:
+                try:
+                    node = command.all_commands[argument][1]
+                except KeyError:
+                    self.print_missing_node(argument, callpath)
+                    return
+            callpath = callpath[:-1] + [(argument, None)]
+
+        write = lambda x: callpath[0][1].out_file.write(x + u"\n")
+        write(get_usage(node, callpath))
+        write(u"")
+        write(node.long_description)
+        write(u"")
+        if not isinstance(node, Command):
+            return
+        commands = sorted(node.commands.items(),
+                          key=lambda x: x[1]._position_hint)
+        options = sorted(node.options.values(),
+                         key=attrgetter("_position_hint"))
+        nodes = []
+        get_length = lambda nodes: max(10, max(len(n[0]) for n in nodes))
+        if commands:
+            nodes.append((u"Commands:", get_length(commands), commands))
+        if options:
+            commands = [
+                (u"-{0} --{1}".format(o.short, o.long), o) for o in options]
+            nodes.append((u"Commands:", get_length(commands), commands))
+        for label, max_node_length, nodes in nodes:
+            write(label)
+            for node_name, node in nodes:
+                write(u" {0} {1}".format(node_name.ljust(max_node_length),
+                                         node.short_description))
+            write("")
 
 class Parser(Command):
     def __init__(self, script_name=sys.argv[0], description=None,
-                 out_file=sys.stdout, takes_arguments=True):
-        Command.__init__(self, description=None)
+                 out_file=sys.stdout):
+        Command.__init__(self, long_description=description)
         self.script_name = script_name
         self.out_file = out_file
-        self.takes_arguments = takes_arguments
 
     @property
     def out_file(self):
@@ -425,4 +594,4 @@ class Parser(Command):
     def __repr__(self):
         return "{0}(script_name={1!r}, description={2!r})" \
                 .format(self.__class__.__name__, self.script_name,
-                        self.description)
+                        self.long_description)
