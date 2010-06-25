@@ -11,4 +11,6 @@ Features
 - Supports abbreviations of commands and options e.g. ``hg cl`` instead of
   ``hg clone`` or ``hg --he`` instead of ``hg --help``.
 
+- Shows possible alternatives if you pass a command or an option does not exist
+
 - Declarative syntax for commands and parser.
