@@ -577,7 +577,7 @@ class Parser(Command):
             errors = "replace"
         else:
             errors = "strict"
-        codec_info = codecs.lookup(fobj.encoding)
+        codec_info = codecs.lookup(encoding)
         self._out_file = codecs.StreamReaderWriter(fobj,
                                                    codec_info.streamreader,
                                                    codec_info.streamwriter,
