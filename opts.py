@@ -553,9 +553,10 @@ class HelpCommand(Command):
             write("")
 
 class Parser(Command):
-    def __init__(self, script_name=sys.argv[0], description=None,
-                 out_file=sys.stdout):
-        Command.__init__(self, long_description=description)
+    def __init__(self, options=None, commands=None, script_name=sys.argv[0],
+                 description=None, out_file=sys.stdout):
+        Command.__init__(self, options=options, commands=commands,
+                         long_description=description)
         self.script_name = script_name
         self.out_file = out_file
 
