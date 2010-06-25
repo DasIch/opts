@@ -370,20 +370,22 @@ class Command(Node):
             commands[abbr] = commands[command]
         return commands
 
-    def print_missing_node(self, node, callpath):
+    def print_missing_node(self, node, callpath, command):
         write = lambda x: callpath[0][1].out_file.write(x + u"\n")
         write(get_usage(callpath[-1][1], callpath))
         write(u"")
         if node.startswith(u"-"):
             type = u"option"
-            possible_items = [option.long for option in self.options.values()]
+            possible_items = [option.long for option in command.options.values()]
         else:
             type = u"command"
-            possible_items = self.commands.keys()
+            possible_items = command.commands.keys()
         for shorter_version in shorter(node):
             items = list(matches(shorter_version, possible_items))
             if items:
                 break
+        else:
+            items = list(matches(node, possible_items))
         if not items:
             write(u"The given {0} \"{1}\" does not exist.".format(type, node))
             return
@@ -436,7 +438,7 @@ class Command(Node):
             try:
                 name, option = self.short_options[short]
             except KeyError:
-                self.print_missing_node(u"-" + short, callpath)
+                self.print_missing_node(u"-" + short, callpath, self)
                 return
             callpath[-1] = (callpath[-1][0], option)
             if option.requires_argument:
@@ -456,7 +458,7 @@ class Command(Node):
         try:
             name, option = self.long_options[long]
         except KeyError:
-            self.print_missing_node(callpath[-1][0], callpath)
+            self.print_missing_node(callpath[-1][0], callpath, self)
             return
         callpath[-1] = (callpath[-1][0], option)
         used_arguments = []
@@ -507,7 +509,7 @@ class HelpCommand(Command):
                 try:
                     node = command.long_options[argument[2:]][1]
                 except KeyError:
-                    self.print_missing_node(argument, callpath)
+                    self.print_missing_node(argument, callpath, command)
                     return
                 else:
                     argument = argument[2:]
@@ -515,7 +517,7 @@ class HelpCommand(Command):
                 try:
                     node = command.short_options[argument[1:]][1]
                 except KeyError:
-                    self.print_missing_node(argument, callpath)
+                    self.print_missing_node(argument, callpath, command)
                     return
                 else:
                     argument = argument[1:]
@@ -523,7 +525,7 @@ class HelpCommand(Command):
                 try:
                     node = command.all_commands[argument][1]
                 except KeyError:
-                    self.print_missing_node(argument, callpath)
+                    self.print_missing_node(argument, callpath, command)
                     return
             callpath = callpath[:-1] + [(argument, None)]
 
