@@ -144,7 +144,8 @@ class Node(object):
 
     @property
     def long_description(self):
-        return self._long_description or u"No long description."
+        desc = self._long_description or self._short_description
+        return desc or u"No long description."
 
     @long_description.setter
     def long_description(self, long_description):
