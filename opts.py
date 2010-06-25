@@ -588,9 +588,10 @@ class Parser(Command):
         Evaluates the given list of ``arguments`` and returns a dictionary with
         the options and a list with the remaining arguments.
         """
-        arguments = decode_arguments(arguments or sys.argv[1:])
-        return Command.evaluate(self, [(self.script_name, self)],
-                                arguments or sys.argv[1:])
+        if arguments is None:
+            arguments = sys.argv[1:]
+        arguments = decode_arguments(arguments)
+        return Command.evaluate(self, [(self.script_name, self)], arguments)
 
     def __repr__(self):
         return "{0}(script_name={1!r}, description={2!r})" \
