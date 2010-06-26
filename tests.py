@@ -13,6 +13,10 @@ import unittest
 
 from opts import *
 
+class TestOption(unittest.TestCase):
+    def test_valueerror_on_init(self):
+        self.assertRaises(ValueError, Option)
+
 class TestCommand(unittest.TestCase):
     def test_remaining_arguments(self):
         c = Command(options={'a': Option('a')})
@@ -90,6 +94,7 @@ class TestParser(unittest.TestCase):
 
 def suite():
     suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(TestOption))
     suite.addTest(unittest.makeSuite(TestCommand))
     suite.addTest(unittest.makeSuite(TestParser))
     return suite
