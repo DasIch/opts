@@ -13,7 +13,7 @@ import unittest
 from decimal import Decimal
 
 from opts import (Node, Option, BooleanOption, IntOption, FloatOption,
-                  DecimalOption, Command, Parser)
+                  DecimalOption, MultipleOptions, Command, Parser)
 
 def xrange(*args):
     if len(args) == 1:
@@ -67,6 +67,25 @@ class TestNumberOptions(unittest.TestCase):
     def make_test(self, range, o):
         for i in range:
             self.assertEqual(o.evaluate([(u'-o', o)], unicode(i)), i)
+
+class TestMultipleOptions(unittest.TestCase):
+    def test_evaluate_no_quotes(self):
+        o = MultipleOptions(short='o')
+        self.assertEqual(
+            o.evaluate([(u'-o', o)], u'foo,bar,baz'),
+            [u'foo', u'bar', u'baz']
+        )
+
+    def test_evaluate_with_quotes(self):
+        o = MultipleOptions(short='o')
+        self.assertEqual(
+            o.evaluate([(u'-o', o)], u'foo,"bar,baz"'),
+            [u'foo', u'bar,baz']
+        )
+        self.assertEqual(
+            o.evaluate([(u'-o', o)], u'"foo,bar",baz'),
+            [u'foo,bar', u'baz']
+        )
 
 class TestCommand(unittest.TestCase):
     def test_remaining_arguments(self):
@@ -149,6 +168,7 @@ def suite():
     suite.addTest(unittest.makeSuite(TestOption))
     suite.addTest(unittest.makeSuite(TestBooleanOption))
     suite.addTest(unittest.makeSuite(TestNumberOptions))
+    suite.addTest(unittest.makeSuite(TestMultipleOptions))
     suite.addTest(unittest.makeSuite(TestCommand))
     suite.addTest(unittest.makeSuite(TestParser))
     return suite
