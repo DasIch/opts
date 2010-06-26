@@ -47,9 +47,11 @@ class TestOption(unittest.TestCase):
 class TestBooleanOption(unittest.TestCase):
     def test_evaluate(self):
         o = BooleanOption(short="b")
-        self.assertEqual(o.evaluate([("-b", o)]), True)
+        p = Parser(options=dict(b=o))
+        self.assertEqual(p.evaluate([u'-b']), ({'b': True}, []))
         o = BooleanOption(short="b", default=True)
-        self.assertEqual(o.evaluate([("-b", o)]), False)
+        p = Parser(options=dict(b=o))
+        self.assertEqual(p.evaluate(['-b']), ({'b': False}, []))
 
 class TestNumberOptions(unittest.TestCase):
     def test_intoption_evaluate(self):
@@ -65,36 +67,47 @@ class TestNumberOptions(unittest.TestCase):
         )
 
     def make_test(self, range, o):
+        p = Parser(options=dict(o=o))
         for i in range:
-            self.assertEqual(o.evaluate([(u'-o', o)], unicode(i)), i)
+            self.assertEqual(p.evaluate([u'-o', unicode(i)]), ({'o': i}, []))
 
 class TestMultipleOptions(unittest.TestCase):
     def test_evaluate_no_quotes(self):
         o = MultipleOptions(short='o')
+        p = Parser(options=dict(o=o))
         self.assertEqual(
-            o.evaluate([(u'-o', o)], u'foo,bar,baz'),
-            [u'foo', u'bar', u'baz']
+            p.evaluate([u'-o', u'foo,bar,baz']),
+            ({'o': [u'foo', u'bar', u'baz']}, [])
         )
 
     def test_evaluate_with_quotes(self):
         o = MultipleOptions(short='o')
+        p = Parser(options=dict(o=o))
         self.assertEqual(
-            o.evaluate([(u'-o', o)], u'foo,"bar,baz"'),
-            [u'foo', u'bar,baz']
+            p.evaluate([u'-o', u'foo,"bar,baz"']),
+            ({'o': [u'foo', u'bar,baz']}, [])
         )
         self.assertEqual(
-            o.evaluate([(u'-o', o)], u'"foo,bar",baz'),
-            [u'foo,bar', u'baz']
+            p.evaluate([u'-o', u'"foo,bar",baz']),
+            ({'o': [u'foo,bar', u'baz']}, [])
         )
 
 class TestCommand(unittest.TestCase):
     def test_remaining_arguments(self):
         c = Command(options={'a': Option('a')})
-        cp = [u'script_name']
-        self.assertEqual(c.evaluate(cp, [u'foo']), ({}, [u'foo']))
-        self.assertEqual(c.evaluate(cp, [u'-a', u'foo']), ({'a': u'foo'}, []))
-        self.assertEqual(c.evaluate(cp, [u'-a', u'foo', u'bar']),
-                         ({'a': u'foo'}, [u'bar']))
+        p = Parser(commands=dict(c=c))
+        self.assertEqual(
+            p.evaluate([u'c', u'foo']),
+            ({'c': ({}, [u'foo'])}, [])
+        )
+        self.assertEqual(
+            p.evaluate([u'c', u'-a', u'foo']),
+            ({'c': ({'a': u'foo'}, [])}, [])
+        )
+        self.assertEqual(
+            p.evaluate([u'c', u'-a', u'foo', u'bar']),
+            ({u'c': ({'a': u'foo'}, [u'bar'])}, [])
+        )
 
     def test_options(self):
         class TestDeclarative(Command):
@@ -104,16 +117,24 @@ class TestCommand(unittest.TestCase):
         b = Command(options={
             'spam': Option('a', 'asomething'),
             'eggs': Option('b', 'bsomething')})
-        cp = [u'script_name']
         for c in [a, b]:
-            self.assertEqual(c.evaluate(cp, [u'-a', u'foo']),
-                             ({u'spam': u'foo'}, []))
-            self.assertEqual(c.evaluate(cp, [u'--asomething', u'foo']),
-                             ({u'spam': u'foo'}, []))
-            self.assertEqual(c.evaluate(cp, [u'-b', u'foo']),
-                             ({u'eggs': u'foo'}, []))
-            self.assertEqual(c.evaluate(cp, [u'--bsomething', u'foo']),
-                             ({u'eggs': u'foo'}, []))
+            p = Parser(commands=dict(c=c))
+            self.assertEqual(
+                p.evaluate([u'c', u'-a', u'foo']),
+                ({'c': ({'spam': u'foo'}, [])}, [])
+            )
+            self.assertEqual(
+                p.evaluate([u'c', u'--asomething', u'foo']),
+                ({'c': ({'spam': u'foo'}, [])}, [])
+            )
+            self.assertEqual(
+                p.evaluate([u'c', u'-b', u'foo']),
+                ({'c': ({u'eggs': u'foo'}, [])}, [])
+            )
+            self.assertEqual(
+                p.evaluate([u'c', u'--bsomething', u'foo']),
+                ({'c': ({u'eggs': u'foo'}, [])}, [])
+            )
 
     def test_commands(self):
         class TestDeclarative(Command):
@@ -125,8 +146,15 @@ class TestCommand(unittest.TestCase):
             'eggs': Command()})
         cp = [u'script_name']
         for c in [a, b]:
-            self.assertEqual(c.evaluate(cp, [u'spam']), ({u'spam': ({}, [])}, []))
-            self.assertEqual(c.evaluate(cp, [u'eggs']), ({u'eggs': ({}, [])}, []))
+            p = Parser(commands=dict(c=c))
+            self.assertEqual(
+                p.evaluate([u'c', u'spam']),
+                ({'c': ({u'spam': ({}, [])}, [])}, [])
+            )
+            self.assertEqual(
+                p.evaluate([u'c', u'eggs']),
+                ({'c': ({'eggs': ({}, [])}, [])}, [])
+            )
 
     def test_abbreviations(self):
         c = Command(
@@ -137,20 +165,31 @@ class TestCommand(unittest.TestCase):
                 'stack': Command(),
                 'stash': Command()})
 
+        p = Parser(commands=dict(c=c))
         cp = [u'script_name']
         for s in [u's', u'st', u'sta']:
-            result = ({}, [s])
-            self.assertEqual(c.evaluate(cp, [s]), result)
-            self.assertEqual(c.evaluate(cp, [s]), result)
-            self.assertEqual(c.evaluate(cp, [s]), result)
+            cmd = [u'c', s]
+            result = ({'c': ({}, [s])}, [])
+            self.assertEqual(p.evaluate(cmd), result)
+            self.assertEqual(p.evaluate(cmd), result)
+            self.assertEqual(p.evaluate(cmd), result)
 
-        self.assertEqual(c.evaluate(cp, [u'stac']), ({u'stack': ({}, [])}, []))
-        self.assertEqual(c.evaluate(cp, [u'stas']), ({u'stash': ({}, [])}, []))
-
-        self.assertEqual(c.evaluate(cp, [u'--stac', u'foo']),
-                         ({u'stack': u'foo'}, []))
-        self.assertEqual(c.evaluate(cp, [u'--stas', u'foo']),
-                         ({u'stash': u'foo'}, []))
+        self.assertEqual(
+            p.evaluate([u'c', u'stac']),
+            ({'c': ({u'stack': ({}, [])}, [])}, [])
+        )
+        self.assertEqual(
+            p.evaluate([u'c', u'stas']),
+            ({'c': ({u'stash': ({}, [])}, [])}, [])
+        )
+        self.assertEqual(
+            p.evaluate([u'c', u'--stac', u'foo']),
+            ({'c': ({u'stack': u'foo'}, [])}, [])
+        )
+        self.assertEqual(
+            p.evaluate([u'c', u'--stas', u'foo']),
+            ({'c': ({u'stash': u'foo'}, [])}, [])
+        )
 
     def test_disallow_abbreviated_commands(self):
         class NewCommand(Command):
@@ -158,7 +197,8 @@ class TestCommand(unittest.TestCase):
         c = NewCommand(commands={
             'foo': Command()
         })
-        self.assertEqual(c.evaluate([], [u'f']), ({}, [u'f']))
+        p = Parser(commands=dict(c=c))
+        self.assertEqual(p.evaluate([u'c', u'f']), ({'c': ({}, [u'f'])}, []))
 
 class TestParser(unittest.TestCase):
     def test_default_evaluate_arguments(self):
