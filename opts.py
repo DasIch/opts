@@ -32,38 +32,6 @@ class Missing(object):
 missing = Missing()
 del Missing
 
-class cached_property(object):
-    """
-    A cached property object caches the value returned by the ``getter``.
-
-    :param name:
-        The name which should be used for the property, if you don't pass one
-        the name of the ``getter`` is used.
-
-    :param doc:
-        The docstring which should be used for the property, if no one is
-        passed the ``getter``'s docstring is used.
-    """
-    def __init__(self, getter, name=None, doc=None):
-        self.getter = getter
-        self.__name__ = name or getter.__name__
-        self.__module__ = getter.__module__
-        self.__doc__ = doc or getter.__doc__
-
-    def __get__(self, obj, type=None):
-        missing = object()
-        if obj is None:
-            return self
-        value = obj.__dict__.get(self.__name__, missing)
-        if value is missing:
-            value = self.getter(obj)
-            obj.__dict__[self.__name__] = value
-        return value
-
-    def __repr__(self):
-        return "{0}({1!r}, name={2!r}, doc={3!r})".format(self.getter,
-                                                          self.name, self.doc)
-
 def decode_arguments(arguments,
                      encoding=sys.stdin.encoding or sys.getdefaultencoding()):
     """
@@ -350,7 +318,7 @@ class Command(Node):
         if takes_arguments is not None:
             self.takes_arguments = takes_arguments
 
-    @cached_property
+    @property
     def short_options(self):
         """
         A dictionary mapping the short variants of the options to a tuple of
@@ -361,7 +329,7 @@ class Command(Node):
             result[option.short] = (name, option)
         return result
 
-    @cached_property
+    @property
     def long_options(self):
         """
         A dictionary mapping the long variants of the options to a tuple of
@@ -378,8 +346,12 @@ class Command(Node):
             result[abbr] = long_options[long_option]
         return result
 
-    @cached_property
+    @property
     def all_commands(self):
+        """
+        A dictionary mapping the command names (including abbreviations) to a
+        tuple of the complete command name and the command itself.
+        """
         commands = dict((k, (k, v)) for k, v in self.commands.iteritems())
         if not self.allow_abbreviated_commands:
             return commands.copy()
