@@ -11,7 +11,20 @@
 """
 import unittest
 
-from opts import *
+from opts import Node, Option, Command, Parser
+
+class TestNode(unittest.TestCase):
+    def test_short_description_fallback(self):
+        n = Node()
+        self.assertEqual(n.short_description, u"No short description.")
+
+    def test_long_description_fallback(self):
+        n = Node()
+        self.assertEqual(n.long_description, u"No long description.")
+
+    def test_long_description_fallback_to_short(self):
+        n = Node(short_description=u"Foobar")
+        self.assertEqual(n.long_description, u"Foobar")
 
 class TestOption(unittest.TestCase):
     def test_valueerror_on_init(self):
@@ -94,6 +107,7 @@ class TestParser(unittest.TestCase):
 
 def suite():
     suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(TestNode))
     suite.addTest(unittest.makeSuite(TestOption))
     suite.addTest(unittest.makeSuite(TestCommand))
     suite.addTest(unittest.makeSuite(TestParser))
