@@ -194,6 +194,8 @@ class Option(Node):
                  short_description=None, long_description=None):
         Node.__init__(self, short_description=short_description,
                       long_description=long_description)
+        if short is long is None:
+            raise ValueError("you need to specify a short and/or long")
         self.short = unicode(short)
         self.long = unicode(long)
         self.default = default
