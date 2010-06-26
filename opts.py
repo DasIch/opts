@@ -265,10 +265,12 @@ class MultipleOptions(Option):
         'foo,"bar,baz"' -> ["foo", "bar,baz"]
     """
     def __init__(self, sub_option=Option, short=None, long=None,
-                 default=missing, description=None):
+                 default=missing, short_description=None,
+                 long_description=None):
         Option.__init__(self, short=short, long=long, default=default,
-                        description=description)
-        self.sub_option = sub_option()
+                        short_description=short_description,
+                        long_description=long_description)
+        self.sub_option = sub_option(long=u'sub-option')
 
     def evaluate(self, callpath, argument):
         result = []
@@ -281,13 +283,20 @@ class MultipleOptions(Option):
                     buffer = []
                 open_quote = not open_quote
             elif char == u"," and not open_quote:
+                if not buffer:
+                    continue
                 result.append(u"".join(buffer))
                 buffer = []
             else:
                 buffer.append(char)
         if buffer:
             result.append(u"".join(buffer))
-        return map(self.sub_option.evaluate, result)
+        sub_option_cp = callpath + [(u'--sub-option', self.sub_option)]
+        print result
+        return [
+            self.sub_option.evaluate(sub_option_cp, arg)
+            for arg in result
+        ]
 
 def get_option_attributes(obj):
     return getmembers(obj, lambda x: isinstance(x, Option))
