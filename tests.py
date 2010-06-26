@@ -10,8 +10,22 @@
     :license: BSD, see LICENSE for details
 """
 import unittest
+from decimal import Decimal
 
-from opts import Node, Option, BooleanOption, IntOption, Command, Parser
+from opts import (Node, Option, BooleanOption, IntOption, FloatOption,
+                  DecimalOption, Command, Parser)
+
+def xrange(*args):
+    if len(args) == 1:
+        start, stop, step = 0, args[0], 1
+    elif len(args) == 2:
+        start, stop, step = args[0], args[1], 1
+    else:
+        start, stop, step = args
+    i = start
+    while i <= stop:
+        yield i
+        i += step
 
 class TestNode(unittest.TestCase):
     def test_short_description_fallback(self):
@@ -37,11 +51,22 @@ class TestBooleanOption(unittest.TestCase):
         o = BooleanOption(short="b", default=True)
         self.assertEqual(o.evaluate([("-b", o)]), False)
 
-class TestIntOption(unittest.TestCase):
-    def test_evaluate(self):
-        o = IntOption(short="i")
-        for i in xrange(-10, 10):
-            self.assertEqual(o.evaluate([(u'-i', o)], unicode(i)), i)
+class TestNumberOptions(unittest.TestCase):
+    def test_intoption_evaluate(self):
+        self.make_test(xrange(-10, 10), IntOption(short='o'))
+
+    def test_floatoption_evaluate(self):
+        self.make_test(xrange(-10.0, 10.0, 0.5), FloatOption(short='o'))
+
+    def test_decimaloption_evaluate(self):
+        self.make_test(
+            xrange(Decimal('-10.0'), Decimal('10.0'), Decimal('0.5')),
+            DecimalOption(short='o')
+        )
+
+    def make_test(self, range, o):
+        for i in range:
+            self.assertEqual(o.evaluate([(u'-o', o)], unicode(i)), i)
 
 class TestCommand(unittest.TestCase):
     def test_remaining_arguments(self):
@@ -123,7 +148,7 @@ def suite():
     suite.addTest(unittest.makeSuite(TestNode))
     suite.addTest(unittest.makeSuite(TestOption))
     suite.addTest(unittest.makeSuite(TestBooleanOption))
-    suite.addTest(unittest.makeSuite(TestIntOption))
+    suite.addTest(unittest.makeSuite(TestNumberOptions))
     suite.addTest(unittest.makeSuite(TestCommand))
     suite.addTest(unittest.makeSuite(TestParser))
     return suite
