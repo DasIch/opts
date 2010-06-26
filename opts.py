@@ -292,7 +292,6 @@ class MultipleOptions(Option):
         if buffer:
             result.append(u"".join(buffer))
         sub_option_cp = callpath + [(u'--sub-option', self.sub_option)]
-        print result
         return [
             self.sub_option.evaluate(sub_option_cp, arg)
             for arg in result
