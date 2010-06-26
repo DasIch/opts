@@ -152,6 +152,14 @@ class TestCommand(unittest.TestCase):
         self.assertEqual(c.evaluate(cp, [u'--stas', u'foo']),
                          ({u'stash': u'foo'}, []))
 
+    def test_disallow_abbreviated_commands(self):
+        class NewCommand(Command):
+            allow_abbreviated_commands = False
+        c = NewCommand(commands={
+            'foo': Command()
+        })
+        self.assertEqual(c.evaluate([], [u'f']), ({}, [u'f']))
+
 class TestParser(unittest.TestCase):
     def test_default_evaluate_arguments(self):
         import sys
