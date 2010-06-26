@@ -11,7 +11,7 @@
 """
 import unittest
 
-from opts import Node, Option, BooleanOption, Command, Parser
+from opts import Node, Option, BooleanOption, IntOption, Command, Parser
 
 class TestNode(unittest.TestCase):
     def test_short_description_fallback(self):
@@ -36,6 +36,12 @@ class TestBooleanOption(unittest.TestCase):
         self.assertEqual(o.evaluate([("-b", o)]), True)
         o = BooleanOption(short="b", default=True)
         self.assertEqual(o.evaluate([("-b", o)]), False)
+
+class TestIntOption(unittest.TestCase):
+    def test_evaluate(self):
+        o = IntOption(short="i")
+        for i in xrange(-10, 10):
+            self.assertEqual(o.evaluate([(u'-i', o)], unicode(i)), i)
 
 class TestCommand(unittest.TestCase):
     def test_remaining_arguments(self):
@@ -117,6 +123,7 @@ def suite():
     suite.addTest(unittest.makeSuite(TestNode))
     suite.addTest(unittest.makeSuite(TestOption))
     suite.addTest(unittest.makeSuite(TestBooleanOption))
+    suite.addTest(unittest.makeSuite(TestIntOption))
     suite.addTest(unittest.makeSuite(TestCommand))
     suite.addTest(unittest.makeSuite(TestParser))
     return suite
