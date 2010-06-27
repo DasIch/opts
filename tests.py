@@ -10,6 +10,7 @@
     :license: BSD, see LICENSE for details
 """
 import unittest
+import sys
 from decimal import Decimal
 from StringIO import StringIO
 
@@ -203,7 +204,6 @@ class TestCommand(unittest.TestCase):
 
 class TestParser(unittest.TestCase):
     def test_default_evaluate_arguments(self):
-        import sys
         old_argv = sys.argv
         enc = sys.stdin.encoding or sys.getdefaultencoding()
         sys.argv = [s.encode(enc) for s in [u'script_name', u'foo', u'bar']]
@@ -214,10 +214,12 @@ class TestParser(unittest.TestCase):
 class TestParserOutput(unittest.TestCase):
     def setUp(self):
         self.out_file = StringIO()
+        self._old_argv = sys.argv
+        sys.argv = ['script']
 
     def tearDown(self):
-        self.out_file.truncate(0)
-        self.out_file.seek(0)
+        self.out_file = StringIO()
+        sys.argv = self._old_argv
 
     def assertContains(self, container, item):
         if item not in container:
@@ -235,6 +237,7 @@ class TestParserOutput(unittest.TestCase):
         for cmd in [u's', u'st', u'sta']:
             self.assertRaises(SystemExit, p.evaluate, [cmd])
             output = self.out_file.getvalue()
+            self.assertContains(output, u'usage: script [commands]')
             self.assertContains(
                 output,
                 u'command "{0}" does not exist, did you mean?'.format(cmd)
@@ -253,12 +256,37 @@ class TestParserOutput(unittest.TestCase):
         for option in [u'--s', u'--st', u'--sta']:
             self.assertRaises(SystemExit, p.evaluate, [option])
             output = self.out_file.getvalue()
+            self.assertContains(output, u'usage: script [options]')
             self.assertContains(
                 output,
                 u'option "{0}" does not exist, did you mean?'.format(option)
             )
             self.assertContains(output, u'--stack')
             self.assertContains(output, u'--stash')
+
+    def test_nonexisting_command(self):
+        p = Parser(
+            out_file=self.out_file,
+            takes_arguments=False
+        )
+        self.assertRaises(SystemExit, p.evaluate, [u'foo'])
+        output = self.out_file.getvalue()
+        self.assertContains(output, u'usage: script')
+        self.assertContains(output, u'command "foo" does not exist')
+
+    def test_nonexisting_long_option(self):
+        p = Parser(out_file=self.out_file)
+        self.assertRaises(SystemExit, p.evaluate, [u'--foo'])
+        output = self.out_file.getvalue()
+        self.assertContains(output, u'usage: script')
+        self.assertContains(output, u'option "--foo" does not exist')
+
+    def test_nonexisting_short_option(self):
+        p = Parser(out_file=self.out_file)
+        self.assertRaises(SystemExit, p.evaluate, [u'-f'])
+        output = self.out_file.getvalue()
+        self.assertContains(output, u'usage: script')
+        self.assertContains(output, u'option "-f" does not exist')
 
 def suite():
     suite = unittest.TestSuite()

@@ -362,11 +362,11 @@ class Command(Node):
     def print_missing_node(self, node, callpath, command):
         write = lambda x: callpath[0][1].out_file.write(x + u"\n")
         if node.startswith(u"-"):
-            write(callpath[-2][1].get_usage(callpath))
+            write(callpath[-2][1].get_usage(callpath[:1]))
             type = u"option"
             possible_items = [option.long for option in command.options.values()]
         else:
-            write(callpath[-1][1].get_usage(callpath))
+            write(callpath[-1][1].get_usage(callpath[:1]))
             type = u"command"
             possible_items = command.commands.keys()
         write(u'')
@@ -546,12 +546,12 @@ class HelpCommand(Command):
             write("")
 
 class Parser(Command):
-    def __init__(self, options=None, commands=None, script_name=sys.argv[0],
+    def __init__(self, options=None, commands=None, script_name=None,
                  description=None, out_file=sys.stdout, takes_arguments=None):
         Command.__init__(self, options=options, commands=commands,
                          long_description=description,
                          takes_arguments=takes_arguments)
-        self.script_name = script_name
+        self.script_name = sys.argv[0] if script_name is None else script_name
         self.out_file = out_file
 
     @property
