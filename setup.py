@@ -7,7 +7,7 @@ from setuptools import setup
 
 setup(
     name=u"opts",
-    version=u"0.1",
+    version=u"0.1.1",
     url=u"http://github.com/DasIch/opts",
     license=u"BSD",
     author=u"Daniel Neuhäuser",
