@@ -233,7 +233,7 @@ class TestParserOutput(unittest.TestCase):
             takes_arguments=False
         )
         for cmd in [u's', u'st', u'sta']:
-            p.evaluate([cmd])
+            self.assertRaises(SystemExit, p.evaluate, [cmd])
             output = self.out_file.getvalue()
             self.assertContains(
                 output,
@@ -241,6 +241,24 @@ class TestParserOutput(unittest.TestCase):
             )
             self.assertContains(output, u'stack')
             self.assertContains(output, u'stash')
+
+    def test_alternative_options(self):
+        p = Parser(
+            options={
+                'stack': Option(long='stack'),
+                'stash': Option(long='stash')
+            },
+            out_file=self.out_file
+        )
+        for option in [u'--s', u'--st', u'--sta']:
+            self.assertRaises(SystemExit, p.evaluate, [option])
+            output = self.out_file.getvalue()
+            self.assertContains(
+                output,
+                u'option "{0}" does not exist'.format(option)
+            )
+            self.assertContains(output, u'--stack')
+            self.assertContains(output, u'--stash')
 
 def suite():
     suite = unittest.TestSuite()

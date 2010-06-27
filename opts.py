@@ -78,15 +78,6 @@ def matches(beginning, strings):
         if string.startswith(beginning):
             yield string
 
-def get_usage(command, callpath):
-    result = [u"usage: {0}".format(u" ".join(map(itemgetter(0), callpath)))]
-    if command.options:
-        result.append(u"[options]")
-    if len(command.commands) > 1 or \
-            command.commands and u"help" not in command.commands:
-        result.append(u"[commands]")
-    return u" ".join(result)
-
 class Node(object):
     """
     Represents an argument passed to your script.
@@ -359,30 +350,42 @@ class Command(Node):
             commands[abbr] = commands[command]
         return commands
 
+    def get_usage(self, callpath):
+        result = [u'usage: {0}'.format(u' '.join(map(itemgetter(0), callpath)))]
+        if self.options:
+            result.append(u'[options]')
+        if len(self.commands) > 1 or \
+                self.commands and u'help' not in self.commands:
+            result.append(u'[commands]')
+        return u' '.join(result)
+
     def print_missing_node(self, node, callpath, command):
         write = lambda x: callpath[0][1].out_file.write(x + u"\n")
-        write(get_usage(callpath[-1][1], callpath))
-        write(u"")
         if node.startswith(u"-"):
+            write(callpath[-2][1].get_usage(callpath))
             type = u"option"
             possible_items = [option.long for option in command.options.values()]
         else:
+            write(callpath[-1][1].get_usage(callpath))
             type = u"command"
             possible_items = command.commands.keys()
-        for shorter_version in shorter(node):
+        write(u'')
+        for shorter_version in shorter(node.strip(u'-')):
             items = list(matches(shorter_version, possible_items))
             if items:
                 break
         else:
-            items = list(matches(node, possible_items))
+            items = list(matches(node.strip(u'-'), possible_items))
         if not items:
             write(u"The given {0} \"{1}\" does not exist.".format(type, node))
-            return
+            sys.exit(1)
         write(u"The given {0} \"{1}\" does not exist, did you mean?" \
                 .format(type, node))
         for item in items:
+            item = u'-' * node[:2].count(u'-') + item
             write(u" - {0}".format(item))
         write(u"")
+        sys.exit(1)
 
     def evaluate(self, callpath, arguments):
         """
@@ -428,7 +431,6 @@ class Command(Node):
                 name, option = self.short_options[short]
             except KeyError:
                 self.print_missing_node(u"-" + short, callpath, self)
-                return
             callpath[-1] = (callpath[-1][0], option)
             if option.requires_argument:
                 result[name] = option.evaluate(callpath, arguments.next()[1])
@@ -448,7 +450,6 @@ class Command(Node):
             name, option = self.long_options[long]
         except KeyError:
             self.print_missing_node(callpath[-1][0], callpath, self)
-            return
         callpath[-1] = (callpath[-1][0], option)
         used_arguments = []
         if option.requires_argument:
@@ -519,7 +520,7 @@ class HelpCommand(Command):
             callpath = callpath[:-1] + [(argument, None)]
 
         write = lambda x: callpath[0][1].out_file.write(x + u"\n")
-        write(get_usage(node, callpath))
+        write(node.get_usage(callpath))
         write(u"")
         write(node.long_description)
         write(u"")
