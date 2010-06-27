@@ -11,6 +11,7 @@
 """
 import unittest
 from decimal import Decimal
+from StringIO import StringIO
 
 from opts import (Node, Option, BooleanOption, IntOption, FloatOption,
                   DecimalOption, MultipleOptions, Command, Parser)
@@ -210,6 +211,37 @@ class TestParser(unittest.TestCase):
         self.assertEqual(p.evaluate(), ({}, [u'foo', u'bar']))
         sys.argv = old_argv
 
+class TestParserOutput(unittest.TestCase):
+    def setUp(self):
+        self.out_file = StringIO()
+
+    def tearDown(self):
+        self.out_file.truncate(0)
+        self.out_file.seek(0)
+
+    def assertContains(self, container, item):
+        if item not in container:
+            raise AssertionError("{0!r} not in {1!r}".format(item, container))
+
+    def test_alternative_commands(self):
+        p = Parser(
+            commands={
+                'stack': Command(),
+                'stash': Command(),
+            },
+            out_file=self.out_file,
+            takes_arguments=False
+        )
+        for cmd in [u's', u'st', u'sta']:
+            p.evaluate([cmd])
+            output = self.out_file.getvalue()
+            self.assertContains(
+                output,
+                u'command "{0}" does not exist'.format(cmd)
+            )
+            self.assertContains(output, u'stack')
+            self.assertContains(output, u'stash')
+
 def suite():
     suite = unittest.TestSuite()
     suite.addTest(unittest.makeSuite(TestNode))
@@ -219,6 +251,7 @@ def suite():
     suite.addTest(unittest.makeSuite(TestMultipleOptions))
     suite.addTest(unittest.makeSuite(TestCommand))
     suite.addTest(unittest.makeSuite(TestParser))
+    suite.addTest(unittest.makeSuite(TestParserOutput))
     return suite
 
 if __name__ == "__main__":
