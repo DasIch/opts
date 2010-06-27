@@ -237,7 +237,7 @@ class TestParserOutput(unittest.TestCase):
             output = self.out_file.getvalue()
             self.assertContains(
                 output,
-                u'command "{0}" does not exist'.format(cmd)
+                u'command "{0}" does not exist, did you mean?'.format(cmd)
             )
             self.assertContains(output, u'stack')
             self.assertContains(output, u'stash')
@@ -255,7 +255,7 @@ class TestParserOutput(unittest.TestCase):
             output = self.out_file.getvalue()
             self.assertContains(
                 output,
-                u'option "{0}" does not exist'.format(option)
+                u'option "{0}" does not exist, did you mean?'.format(option)
             )
             self.assertContains(output, u'--stack')
             self.assertContains(output, u'--stash')
