@@ -411,7 +411,7 @@ class Command(Node):
                     name, command = self.all_commands[arguments[i]]
                 except KeyError:
                     if not self.takes_arguments:
-                        self.print_missing_node(arguments[i], callpath)
+                        self.print_missing_node(arguments[i], callpath, self)
                         return
                     return options, arguments[i:]
                 callpath.append((arguments[i], command))
