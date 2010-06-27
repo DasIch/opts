@@ -155,8 +155,8 @@ class Option(Node):
                       long_description=long_description)
         if short is long is None:
             raise ValueError("you need to specify a short and/or long")
-        self.short = unicode(short)
-        self.long = unicode(long)
+        self.short = short if short is None else unicode(short)
+        self.long = long if long is None else unicode(long)
         self.default = default
 
     def evaluate(self, callpath, argument=missing):
@@ -488,6 +488,13 @@ class HelpCommand(Command):
                          allow_abbreviated_options=allow_abbreviated_options)
 
     def evaluate(self, callpath, arguments):
+        def get_node(node, argument, d):
+            try:
+                node = d[node][1]
+            except KeyError:
+                command.print_missing_node(argument, callpath)
+            return node
+
         command = callpath[-2][1]
         try:
             argument = arguments[0]
@@ -496,27 +503,25 @@ class HelpCommand(Command):
             callpath = callpath[:-1]
         else:
             if argument.startswith(u'--'):
-                try:
-                    node = command.long_options[argument[2:]][1]
-                except KeyError:
-                    command.print_missing_node(argument, callpath)
-                    return
-                else:
-                    argument = argument[2:]
+                node = get_node(
+                    argument[2:],
+                    argument,
+                    command.long_options,
+                )
+                argument = argument[2:]
             if argument.startswith(u'-'):
-                try:
-                    node = command.short_options[argument[1:]][1]
-                except KeyError:
-                    command.print_missing_node(argument, callpath)
-                    return
-                else:
-                    argument = argument[1:]
+                node = get_node(
+                    argument[1:],
+                    argument,
+                    command.short_options,
+                )
+                argument = argument[1:]
             else:
-                try:
-                    node = command.all_commands[argument][1]
-                except KeyError:
-                    command.print_missing_node(argument, callpath)
-                    return
+                node = get_node(
+                    argument,
+                    argument,
+                    command.all_commands,
+                )
             callpath = callpath[:-1] + [(argument, None)]
 
         write = lambda x: callpath[0][1].out_file.write(x + u"\n")
@@ -525,7 +530,7 @@ class HelpCommand(Command):
         write(node.long_description)
         write(u"")
         if not isinstance(node, Command):
-            return
+            sys.exit(1)
         commands = sorted(node.commands.items(),
                           key=lambda x: x[1]._position_hint)
         options = sorted(node.options.values(),
@@ -535,15 +540,31 @@ class HelpCommand(Command):
         if commands:
             nodes.append((u"Commands:", get_length(commands), commands))
         if options:
-            commands = [
-                (u"-{0} --{1}".format(o.short, o.long), o) for o in options]
-            nodes.append((u"Commands:", get_length(commands), commands))
+            option_nodes = []
+            for option in options:
+                if option.short is None:
+                    option_nodes.append(
+                        (u'--{0}'.format(option.long), option)
+                    )
+                elif option.long is None:
+                    option_nodes.append(
+                        (u'-{0}'.format(option.short), option)
+                    )
+                else:
+                    option_nodes.append((
+                        u'-{0} --{1}'.format(
+                            option.short, option.long
+                        ),
+                        option
+                    ))
+            nodes.append((u"Options:", get_length(option_nodes), option_nodes))
         for label, max_node_length, nodes in nodes:
             write(label)
             for node_name, node in nodes:
                 write(u" {0} {1}".format(node_name.ljust(max_node_length),
                                          node.short_description))
             write("")
+        sys.exit(1)
 
 class Parser(Command):
     def __init__(self, options=None, commands=None, script_name=None,

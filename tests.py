@@ -29,7 +29,12 @@ def xrange(*args):
         yield i
         i += step
 
-class TestNode(unittest.TestCase):
+class TestCase(unittest.TestCase):
+    def assertContains(self, container, item):
+        if item not in container:
+            raise AssertionError('{0!r} not in {1!r}'.format(item, container))
+
+class TestNode(TestCase):
     def test_short_description_fallback(self):
         n = Node()
         self.assertEqual(n.short_description, u"No short description.")
@@ -42,11 +47,11 @@ class TestNode(unittest.TestCase):
         n = Node(short_description=u"Foobar")
         self.assertEqual(n.long_description, u"Foobar")
 
-class TestOption(unittest.TestCase):
+class TestOption(TestCase):
     def test_valueerror_on_init(self):
         self.assertRaises(ValueError, Option)
 
-class TestBooleanOption(unittest.TestCase):
+class TestBooleanOption(TestCase):
     def test_evaluate(self):
         o = BooleanOption(short="b")
         p = Parser(options=dict(b=o))
@@ -55,7 +60,7 @@ class TestBooleanOption(unittest.TestCase):
         p = Parser(options=dict(b=o))
         self.assertEqual(p.evaluate(['-b']), ({'b': False}, []))
 
-class TestNumberOptions(unittest.TestCase):
+class TestNumberOptions(TestCase):
     def test_intoption_evaluate(self):
         self.make_test(xrange(-10, 10), IntOption(short='o'))
 
@@ -73,7 +78,7 @@ class TestNumberOptions(unittest.TestCase):
         for i in range:
             self.assertEqual(p.evaluate([u'-o', unicode(i)]), ({'o': i}, []))
 
-class TestMultipleOptions(unittest.TestCase):
+class TestMultipleOptions(TestCase):
     def test_evaluate_no_quotes(self):
         o = MultipleOptions(short='o')
         p = Parser(options=dict(o=o))
@@ -94,7 +99,7 @@ class TestMultipleOptions(unittest.TestCase):
             ({'o': [u'foo,bar', u'baz']}, [])
         )
 
-class TestCommand(unittest.TestCase):
+class TestCommand(TestCase):
     def test_remaining_arguments(self):
         c = Command(options={'a': Option('a')})
         p = Parser(commands=dict(c=c))
@@ -202,7 +207,7 @@ class TestCommand(unittest.TestCase):
         p = Parser(commands=dict(c=c))
         self.assertEqual(p.evaluate([u'c', u'f']), ({'c': ({}, [u'f'])}, []))
 
-class TestParser(unittest.TestCase):
+class TestParser(TestCase):
     def test_default_evaluate_arguments(self):
         old_argv = sys.argv
         enc = sys.stdin.encoding or sys.getdefaultencoding()
@@ -211,7 +216,7 @@ class TestParser(unittest.TestCase):
         self.assertEqual(p.evaluate(), ({}, [u'foo', u'bar']))
         sys.argv = old_argv
 
-class TestParserOutput(unittest.TestCase):
+class OutputTest(TestCase):
     def setUp(self):
         self.out_file = StringIO()
         self._old_argv = sys.argv
@@ -221,10 +226,7 @@ class TestParserOutput(unittest.TestCase):
         self.out_file = StringIO()
         sys.argv = self._old_argv
 
-    def assertContains(self, container, item):
-        if item not in container:
-            raise AssertionError("{0!r} not in {1!r}".format(item, container))
-
+class TestParserOutput(OutputTest):
     def test_alternative_commands(self):
         p = Parser(
             commands={
@@ -288,6 +290,65 @@ class TestParserOutput(unittest.TestCase):
         self.assertContains(output, u'usage: script')
         self.assertContains(output, u'option "-f" does not exist')
 
+class TestHelp(OutputTest):
+    def test_commands_only(self):
+        p = Parser(
+            commands={
+                'foo': Command(short_description=u'foo description'),
+                'bar': Command(short_description=u'bar description')
+            },
+            description=u'The script description',
+            out_file=self.out_file
+        )
+        self.assertRaises(SystemExit, p.evaluate, [u'help'])
+        output = self.out_file.getvalue()
+        self.assertContains(output, u'usage: script [commands]')
+        self.assertContains(output, p.long_description)
+        self.assertContains(output, u'Commands:')
+        self.assertContains(output, u' foo')
+        self.assertContains(output, p.commands['foo'].short_description)
+        self.assertContains(output, u' bar')
+        self.assertContains(output, p.commands['bar'].short_description)
+
+    def test_options_only(self):
+        p = Parser(
+            options={
+                'foo': Option('f'),
+                'bar': Option(long='bar'),
+                'baz': Option('b', 'baz')
+            },
+            out_file=self.out_file
+        )
+        self.assertRaises(SystemExit, p.evaluate, [u'help'])
+        output = self.out_file.getvalue()
+        self.assertContains(output, u'usage: script [options]')
+        self.assertContains(output, u'Options:')
+        self.assertContains(output, u' -f')
+        self.assertContains(output, u' --bar')
+        self.assertContains(output, u' -b --baz')
+
+    def test_commands_and_options(self):
+        p = Parser(
+            commands={
+                'spam': Command(),
+                'eggs': Command()
+            },
+            options={
+                'foo': Option('f'),
+                'bar': Option('b')
+            },
+            out_file=self.out_file
+        )
+        self.assertRaises(SystemExit, p.evaluate, [u'help'])
+        output = self.out_file.getvalue()
+        self.assertContains(output, u'usage: script [options] [commands]')
+        self.assertContains(output, u'Commands:')
+        self.assertContains(output, u' spam')
+        self.assertContains(output, u' eggs')
+        self.assertContains(output, u'Options:')
+        self.assertContains(output, u' -f')
+        self.assertContains(output, u' -b')
+
 def suite():
     suite = unittest.TestSuite()
     suite.addTest(unittest.makeSuite(TestNode))
@@ -298,6 +359,7 @@ def suite():
     suite.addTest(unittest.makeSuite(TestCommand))
     suite.addTest(unittest.makeSuite(TestParser))
     suite.addTest(unittest.makeSuite(TestParserOutput))
+    suite.addTest(unittest.makeSuite(TestHelp))
     return suite
 
 if __name__ == "__main__":
