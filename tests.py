@@ -245,6 +245,21 @@ class TestCommand(TestCase):
         p.foo.spam
         p.foo.eggs
 
+    def test_dynamically_adding_nodes(self):
+        p = Parser()
+        p.commands['foo'] = Command()
+        p.commands['foo'].options['a'] = BooleanOption('a')
+        p.options['bar'] = Option('b')
+        self.assertEquals(p.evaluate([u'-b', u'spam']), ({'bar': u'spam'}, []))
+        self.assertEquals(
+            p.evaluate([u'foo']),
+            ({'foo': ({'a': False}, [])}, [])
+        )
+        self.assertEquals(
+            p.evaluate([u'foo', u'-a']),
+            ({'foo': ({'a': True}, [])}, [])
+        )
+
 class TestParser(TestCase):
     def test_default_evaluate_arguments(self):
         old_argv = sys.argv
