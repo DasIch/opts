@@ -350,6 +350,15 @@ class Command(Node):
             commands[abbr] = commands[command]
         return commands
 
+    def apply_defaults(self, defaults):
+        for key, value in defaults.iteritems():
+            try:
+                command = self.commands[key]
+            except KeyError:
+                self.options[key].default = value
+            else:
+                command.apply_defaults(value)
+
     def get_usage(self, callpath):
         result = [u'usage: {0}'.format(u' '.join(map(itemgetter(0), callpath)))]
         if self.options:
@@ -568,12 +577,15 @@ class HelpCommand(Command):
 
 class Parser(Command):
     def __init__(self, options=None, commands=None, script_name=None,
-                 description=None, out_file=sys.stdout, takes_arguments=None):
+                 description=None, out_file=sys.stdout, takes_arguments=None,
+                 defaults=None):
         Command.__init__(self, options=options, commands=commands,
                          long_description=description,
                          takes_arguments=takes_arguments)
         self.script_name = sys.argv[0] if script_name is None else script_name
         self.out_file = out_file
+        if defaults is not None:
+            self.apply_defaults(defaults)
 
     @property
     def out_file(self):

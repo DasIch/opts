@@ -207,6 +207,27 @@ class TestCommand(TestCase):
         p = Parser(commands=dict(c=c))
         self.assertEqual(p.evaluate([u'c', u'f']), ({'c': ({}, [u'f'])}, []))
 
+    def test_apply_defaults(self):
+        class FooParser(Parser):
+            activate = BooleanOption('a')
+            foo = Command(
+                options={
+                    'spam': Option('a'),
+                    'eggs': Option('b')
+                }
+            )
+        p = FooParser()
+        p.apply_defaults({
+            'activate': 'huhu',
+            'foo': {
+                'spam': 'bla',
+                'eggs': 'blubb'
+            }
+        })
+        self.assertEquals(p.options['activate'].default, 'huhu')
+        self.assertEquals(p.commands['foo'].options['spam'].default, 'bla')
+        self.assertEquals(p.commands['foo'].options['eggs'].default, 'blubb')
+
 class TestParser(TestCase):
     def test_default_evaluate_arguments(self):
         old_argv = sys.argv
