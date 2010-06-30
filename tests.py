@@ -228,6 +228,23 @@ class TestCommand(TestCase):
         self.assertEquals(p.commands['foo'].options['spam'].default, 'bla')
         self.assertEquals(p.commands['foo'].options['eggs'].default, 'blubb')
 
+    def test_getattr(self):
+        p = Parser(
+            options={
+                'activate': Option('a')
+            },
+            commands={
+                'foo': Command(options={
+                    'spam': Option('b'),
+                    'eggs': Option('c')
+                })
+            }
+        )
+        p.activate
+        p.foo
+        p.foo.spam
+        p.foo.eggs
+
 class TestParser(TestCase):
     def test_default_evaluate_arguments(self):
         old_argv = sys.argv

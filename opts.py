@@ -474,6 +474,14 @@ class Command(Node):
             value = option.evaluate(callpath)
         return {name: value}
 
+    def __getattr__(self, name):
+        for d in [self.commands, self.options]:
+            try:
+                return d[name]
+            except KeyError:
+                pass
+        raise AttributeError(name)
+
     def __repr__(self):
         return ("{0}(options={1!r}, commands={2!r}, short_description={2!r}, "
                 "long_description={3!r}, callback={4!r})"). \
