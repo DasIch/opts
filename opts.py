@@ -12,11 +12,12 @@ import sys
 import codecs
 from decimal import Decimal
 from inspect import getmembers
-from itertools import count, izip_longest
+from itertools import count, izip_longest, izip
 from operator import attrgetter, itemgetter
 
 __all__ = ["Option", "BooleanOption", "IntOption", "FloatOption",
-           "DecimalOption", "MultipleOptions", "Command", "Parser"]
+           "DecimalOption", "MultipleOptions", "Positional", "IntPositional",
+           "FloatPositional", "DecimalPositional", "Command", "Parser"]
 
 missing = object()
 _next_position_hint = count().next
@@ -78,6 +79,25 @@ def matches(beginning, strings):
         if string.startswith(beginning):
             yield string
 
+def parse_multiple(string):
+    buffer = []
+    open_quote = False
+    for char in string:
+        if char in [u"'", u'"']:
+            if open_quote:
+                yield u''.join(buffer)
+                buffer = []
+            open_quote = not open_quote
+        elif char == u',' and not open_quote:
+            if not buffer:
+                continue
+            yield u''.join(buffer)
+            buffer = []
+        else:
+            buffer.append(char)
+    if buffer:
+        yield u''.join(buffer)
+
 class Node(object):
     """
     Represents an argument passed to your script.
@@ -121,6 +141,18 @@ class Node(object):
         return "{0}(short_description={1!r}, long_description={2!r})" \
                 .format(self.__class__.__name__, self.short_description,
                         self.long_description)
+
+class IntNodeMixin(object):
+    def evaluate(self, callpath, argument):
+        return int(argument)
+
+class FloatNodeMixin(object):
+    def evaluate(self, callpath, argument):
+        return float(argument)
+
+class DecimalNodeMixin(object):
+    def evaluate(self, callpath, argument):
+        return Decimal(argument)
 
 class Option(Node):
     """
@@ -190,26 +222,20 @@ class BooleanOption(Option):
     def evaluate(self, callpath):
         return not self.default
 
-class IntOption(Option):
+class IntOption(IntNodeMixin, Option):
     """
     Represents an integer option.
     """
-    def evaluate(self, callpath, argument):
-        return int(argument)
 
-class FloatOption(Option):
+class FloatOption(FloatNodeMixin, Option):
     """
     Represents a float option.
     """
-    def evaluate(self, callpath, argument):
-        return float(argument)
 
-class DecimalOption(Option):
+class DecimalOption(DecimalNodeMixin, Option):
     """
     Represents a decimal option.
     """
-    def evaluate(self, callpath, argument):
-        return Decimal(argument)
 
 class MultipleOptions(Option):
     """
@@ -232,29 +258,47 @@ class MultipleOptions(Option):
         self.sub_option = sub_option(long=u'sub-option')
 
     def evaluate(self, callpath, argument):
-        result = []
-        buffer = []
-        open_quote = False
-        for char in argument:
-            if char in [u"'", u'"']:
-                if open_quote:
-                    result.append(u"".join(buffer))
-                    buffer = []
-                open_quote = not open_quote
-            elif char == u"," and not open_quote:
-                if not buffer:
-                    continue
-                result.append(u"".join(buffer))
-                buffer = []
-            else:
-                buffer.append(char)
-        if buffer:
-            result.append(u"".join(buffer))
         sub_option_cp = callpath + [(u'--sub-option', self.sub_option)]
         return [
             self.sub_option.evaluate(sub_option_cp, arg)
-            for arg in result
+            for arg in parse_multiple(argument)
         ]
+
+class Positional(Node):
+    """
+    Represents a positional string argument.
+
+    :param metavar:
+        The metavariable which should be used to represent this argument in the
+        help message and the usage string.
+    """
+    def __init__(self, metavar, short_description=None, long_description=None):
+        Node.__init__(self, short_description=short_description,
+                      long_description=long_description)
+        self.metavar = metavar
+
+    def evaluate(self, callpath, argument):
+        return argument
+
+    def __repr__(self):
+        return '{0}({1!r}, short_description={2!r}, long_description={3!r})'. \
+                format(self.__class__.__name__, self.metavar,
+                       self.short_description, self.long_description)
+
+class IntPositional(IntNodeMixin, Positional):
+    """
+    Represents a positional integer argument.
+    """
+
+class FloatPositional(FloatNodeMixin, Positional):
+    """
+    Represents a positional float argument.
+    """
+
+class DecimalPositional(DecimalNodeMixin, Positional):
+    """
+    Represents a positional float argument.
+    """
 
 def get_option_attributes(obj):
     return getmembers(obj, lambda x: isinstance(x, Option))
@@ -274,6 +318,8 @@ class Command(Node):
         A function which get's called with the result of the evaluation instead
         of returning it.
     """
+    positionals = []
+
     #: If ``True`` allows commands to be abbreviated e.g. you can pass ``he``
     #: instead of ``help`` as long as there is no conflict with other commands.
     allow_abbreviated_commands = True
@@ -285,10 +331,11 @@ class Command(Node):
     #: and commands, set this to ``False``.
     takes_arguments = True
 
+    #: If ``True`` a help command is added to this command.
     use_auto_help = True
 
-    def __init__(self, options=None, commands=None, short_description=None,
-                 long_description=None, callback=None,
+    def __init__(self, options=None, commands=None, positionals=None,
+                 short_description=None, long_description=None, callback=None,
                  allow_abbreviated_commands=None,
                  allow_abbreviated_options=None,
                  takes_arguments=None):
@@ -298,6 +345,8 @@ class Command(Node):
                             **(options or {}))
         self.commands = dict(get_command_attributes(self.__class__),
                              **(commands or {}))
+        if positionals is not None:
+            self.positionals = positionals
         if self.use_auto_help:
             self.commands.setdefault(u"help", HelpCommand())
         if callback is None or not hasattr(self, "callback"):
@@ -366,6 +415,8 @@ class Command(Node):
         if len(self.commands) > 1 or \
                 self.commands and u'help' not in self.commands:
             result.append(u'[commands]')
+        for positional in self.positionals:
+            result.append(positional.metavar)
         return u' '.join(result)
 
     def print_missing_node(self, node, callpath):
@@ -425,12 +476,19 @@ class Command(Node):
                     if not self.takes_arguments:
                         self.print_missing_node(arguments[i], callpath)
                         return
-                    return options, arguments[i:]
+                    result = options, arguments[i:]
+                    break
                 callpath.append((arguments[i], command))
                 result = command.evaluate(callpath, arguments[1 + i:])
                 if self.callback is not None:
                     self.callback(*result)
-                return {name: result}, []
+                result = {name: result}, []
+                break
+        if self.positionals:
+            for i, (positional, arg) in enumerate(izip(self.positionals,
+                                                       result[1])):
+                callpath.append((positional.metavar, positional))
+                result[1][i] = positional.evaluate(callpath, arg)
         return result
 
     def evaluate_short_options(self, callpath, shorts, arguments):
@@ -494,7 +552,7 @@ class HelpCommand(Command):
 
     def __init__(self, options=None, commands=None,
                  short_description=u"Shows this message.",
-                 long_description=u"Displays every command and option.",
+                 long_description=u"Shows help messages.",
                  callback=None,
                  allow_abbreviated_commands=None,
                  allow_abbreviated_options=None):
@@ -575,6 +633,13 @@ class HelpCommand(Command):
                         option
                     ))
             nodes.append((u"Options:", get_length(option_nodes), option_nodes))
+        if getattr(node, 'positionals', False):
+            positional_nodes = [(p.metavar, p) for p in node.positionals]
+            nodes.append((
+                u"Positional arguments:",
+                get_length(positional_nodes),
+                positional_nodes
+            ))
         for label, max_node_length, nodes in nodes:
             write(label)
             for node_name, node in nodes:
@@ -584,10 +649,11 @@ class HelpCommand(Command):
         sys.exit(1)
 
 class Parser(Command):
-    def __init__(self, options=None, commands=None, script_name=None,
-                 description=None, out_file=sys.stdout, takes_arguments=None,
-                 defaults=None):
+    def __init__(self, options=None, commands=None, positionals=None,
+                 script_name=None, description=None, out_file=sys.stdout,
+                 takes_arguments=None,defaults=None):
         Command.__init__(self, options=options, commands=commands,
+                         positionals=positionals,
                          long_description=description,
                          takes_arguments=takes_arguments)
         self.script_name = sys.argv[0] if script_name is None else script_name

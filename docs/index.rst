@@ -120,6 +120,18 @@ API Reference
 .. autoclass:: MultipleOptions
    :members:
 
+.. autoclass:: Positional
+   :members:
+
+.. autoclass:: IntPositional
+   :members:
+
+.. autoclass:: FloatPositional
+   :members:
+
+.. autoclass:: DecimalPositional
+   :members:
+
 .. autoclass:: Command
    :members:
 

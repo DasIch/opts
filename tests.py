@@ -15,7 +15,8 @@ from decimal import Decimal
 from StringIO import StringIO
 
 from opts import (Node, Option, BooleanOption, IntOption, FloatOption,
-                  DecimalOption, MultipleOptions, Command, Parser)
+                  DecimalOption, MultipleOptions, Positional, IntPositional,
+                  FloatPositional, DecimalPositional, Command, Parser)
 
 def xrange(*args):
     if len(args) == 1:
@@ -33,6 +34,10 @@ class TestCase(unittest.TestCase):
     def assertContains(self, container, item):
         if item not in container:
             raise AssertionError('{0!r} not in {1!r}'.format(item, container))
+
+    def assertContainsAll(self, container, items):
+        for item in items:
+            self.assertContains(container, item)
 
 class TestNode(TestCase):
     def test_short_description_fallback(self):
@@ -98,6 +103,29 @@ class TestMultipleOptions(TestCase):
             p.evaluate([u'-o', u'"foo,bar",baz']),
             ({'o': [u'foo,bar', u'baz']}, [])
         )
+
+class TestPositional(TestCase):
+    def test_evaluate(self):
+        p = Parser(positionals=[Positional('foo')])
+        self.assertEquals(p.evaluate([u'spam']), ({}, [u'spam']))
+
+class TestNumberPositionals(TestCase):
+    def test_intpositional_evaluate(self):
+        self.make_test(xrange(10), IntPositional('foo'))
+
+    def test_floatpositional_evaluate(self):
+        self.make_test(xrange(10, 0.5), FloatPositional('foo'))
+
+    def test_decimalpositional_evaluate(self):
+        self.make_test(
+            xrange(Decimal('0'), Decimal('10.0'), Decimal('0.5')),
+            DecimalPositional('foo')
+        )
+
+    def make_test(self, range, p):
+        parser = Parser(positionals=[p])
+        for i in range:
+            self.assertEqual(parser.evaluate([unicode(i)]), ({}, [i]))
 
 class TestCommand(TestCase):
     def test_remaining_arguments(self):
@@ -344,7 +372,7 @@ class TestParserOutput(OutputTest):
         self.assertContains(output, u'option "-f" does not exist')
 
 class TestHelp(OutputTest):
-    def test_commands_only(self):
+    def test_commands(self):
         p = Parser(
             commands={
                 'foo': Command(short_description=u'foo description'),
@@ -355,15 +383,17 @@ class TestHelp(OutputTest):
         )
         self.assertRaises(SystemExit, p.evaluate, [u'help'])
         output = self.out_file.getvalue()
-        self.assertContains(output, u'usage: script [commands]')
-        self.assertContains(output, p.long_description)
-        self.assertContains(output, u'Commands:')
-        self.assertContains(output, u' foo')
-        self.assertContains(output, p.commands['foo'].short_description)
-        self.assertContains(output, u' bar')
-        self.assertContains(output, p.commands['bar'].short_description)
+        self.assertContainsAll(output, [
+            u'usage: script [commands]',
+            p.long_description,
+            u'Commands:',
+            u' foo',
+            p.commands['foo'].short_description,
+            u' bar',
+            p.commands['bar'].short_description
+        ])
 
-    def test_options_only(self):
+    def test_options(self):
         p = Parser(
             options={
                 'foo': Option('f'),
@@ -374,11 +404,32 @@ class TestHelp(OutputTest):
         )
         self.assertRaises(SystemExit, p.evaluate, [u'help'])
         output = self.out_file.getvalue()
-        self.assertContains(output, u'usage: script [options]')
-        self.assertContains(output, u'Options:')
-        self.assertContains(output, u' -f')
-        self.assertContains(output, u' --bar')
-        self.assertContains(output, u' -b --baz')
+        self.assertContainsAll(output, [
+            u'usage: script [options]',
+            u'Options:',
+            u' -f',
+            u' --bar',
+            u' -b --baz'
+        ])
+
+    def test_positional_arguments(self):
+        p = Parser(
+            positionals=[
+                Positional(u'foo'),
+                Positional(u'bar', short_description=u'something')
+            ],
+            out_file=self.out_file
+        )
+        self.assertRaises(SystemExit, p.evaluate, [u'help'])
+        output = self.out_file.getvalue()
+        self.assertContainsAll(output, [
+            u'usage: script foo bar',
+            u'Positional arguments:',
+            u' foo',
+            u'No short description.',
+            u' bar',
+            u'something'
+        ])
 
     def test_commands_and_options(self):
         p = Parser(
@@ -394,13 +445,67 @@ class TestHelp(OutputTest):
         )
         self.assertRaises(SystemExit, p.evaluate, [u'help'])
         output = self.out_file.getvalue()
+        self.assertContainsAll(output, [
+            u'usage: script [options] [commands]',
+            u'Commands:',
+            u' spam',
+            u' eggs',
+            u'Options:',
+            u' -f',
+            u' -b'
+        ])
+
+class TestUsage(OutputTest):
+    def test_only_commands(self):
+        p = Parser(
+            commands={'foo': Command()},
+            out_file=self.out_file
+        )
+        self.assertRaises(SystemExit, p.evaluate, [u'help'])
+        output = self.out_file.getvalue()
+        self.assertContains(output, u'usage: script [commands]')
+
+    def test_only_options(self):
+        p = Parser(
+            options={'foo': Option('f')},
+            out_file=self.out_file
+        )
+        self.assertRaises(SystemExit, p.evaluate, [u'help'])
+        output = self.out_file.getvalue()
+        self.assertContains(output, u'usage: script [options]')
+
+    def test_commands_and_options(self):
+        p = Parser(
+            options={'foo': Option('f')},
+            commands={'bar': Command()},
+            out_file=self.out_file
+        )
+        self.assertRaises(SystemExit, p.evaluate, [u'help'])
+        output = self.out_file.getvalue()
         self.assertContains(output, u'usage: script [options] [commands]')
-        self.assertContains(output, u'Commands:')
-        self.assertContains(output, u' spam')
-        self.assertContains(output, u' eggs')
-        self.assertContains(output, u'Options:')
-        self.assertContains(output, u' -f')
-        self.assertContains(output, u' -b')
+
+    def test_positionals(self):
+        p = Parser(
+            positionals=[
+                Positional('a'),
+                Positional('b')
+            ],
+            out_file=self.out_file
+        )
+        self.assertRaises(SystemExit, p.evaluate, [u'help'])
+        output = self.out_file.getvalue()
+        self.assertContains(output, u'usage: script a b')
+
+    def test_all(self):
+        p = Parser(
+            options={'foo': Option('f')},
+            commands={'bar': Command()},
+            positionals=[Positional('baz')],
+            out_file=self.out_file
+        )
+        self.assertRaises(SystemExit, p.evaluate, [u'help'])
+        output = self.out_file.getvalue()
+        self.assertContains(output, u'usage: script [options] [commands] baz')
 
 def suite():
     suite = unittest.TestSuite()
@@ -409,10 +514,13 @@ def suite():
     suite.addTest(unittest.makeSuite(TestBooleanOption))
     suite.addTest(unittest.makeSuite(TestNumberOptions))
     suite.addTest(unittest.makeSuite(TestMultipleOptions))
+    suite.addTest(unittest.makeSuite(TestPositional))
+    suite.addTest(unittest.makeSuite(TestNumberPositionals))
     suite.addTest(unittest.makeSuite(TestCommand))
     suite.addTest(unittest.makeSuite(TestParser))
     suite.addTest(unittest.makeSuite(TestParserOutput))
     suite.addTest(unittest.makeSuite(TestHelp))
+    suite.addTest(unittest.makeSuite(TestUsage))
     return suite
 
 if __name__ == "__main__":
